@@ -3,9 +3,9 @@ Option Explicit
 
 Public Sub Main()
     Dim root As JsonData
-    Dim jsonText As String
+    Dim JsonText As String
     
-    jsonText = _
+    JsonText = _
         "{" & _
         """user"":{" & _
             """name"":""Alice""," & _
@@ -24,11 +24,11 @@ Public Sub Main()
     Debug.Print "JsonData VB6 test starting"
     Debug.Print String(60, "=")
     Debug.Print "JSON:"
-    Debug.Print jsonText
+    Debug.Print JsonText
     Debug.Print ""
     
     On Error GoTo ParseErr
-    Set root = ParseJSON(jsonText)
+    Set root = ParseJSON(JsonText)
     On Error GoTo 0
     
     If root Is Nothing Then
@@ -72,6 +72,12 @@ Public Sub Main()
     Debug.Print root.ToJSON("  ")
     Debug.Print ""
     Debug.Print "Done."
+    
+    TestOpenAI_SimpleText
+    TestOpenAI_MultiTurn
+    TestOpenAI_JsonSchema
+    TestOpenAI_JsonObject
+    TestOpenAI_FunctionToolCall_RequestOnly
     
     MsgBox "Done. Check the Immediate Window.", vbInformation
     Exit Sub
@@ -183,4 +189,5 @@ Private Function ScalarToString(ByVal node As JsonData) As String
         ScalarToString = CStr(node.ScalarValue)
     End If
 End Function
+
 

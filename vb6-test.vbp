@@ -1,8 +1,12 @@
 Type=Exe
 Reference=*\G{00020430-0000-0000-C000-000000000046}#2.0#0#C:\Windows\system32\stdole2.tlb#OLE Automation
+Reference=*\G{F5078F18-C551-11D3-89B9-0000F81FE221}#6.0#0#C:\Windows\System32\msxml6.dll#Microsoft XML, v6.0
 Module=Json; Json.bas
 Class=JsonData; JsonData.cls
 Module=Tester; vb6-test.bas
+Class=OpenAI; OpenAI.cls
+Module=OpenAIHelpers; OpenAIHelpers.bas
+Module=OpenAITester; OpenAITester.bas
 Startup="Sub Main"
 HelpFile=""
 Command32=""
