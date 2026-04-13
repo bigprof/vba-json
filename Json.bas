@@ -1,5 +1,5 @@
 Attribute VB_Name = "Json"
-Option Compare Database
+Option Compare Text
 Option Explicit
 
 ' Author: Michele Locati <michele@locati.it>
