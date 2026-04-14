@@ -114,19 +114,31 @@ Public Function CreateChatCompletion( _
     AppendOptionalJsonDouble body, "temperature", Temperature
     AppendOptionalJsonLong body, "max_completion_tokens", MaxCompletionTokens
     AppendOptionalJsonString body, "verbosity", Verbosity
-    AppendOptionalRawJson body, "response_format", ResponseFormatJson
-    AppendOptionalRawJson body, "tools", ToolsJson
-    AppendOptionalRawJson body, "tool_choice", ToolChoiceJson
+    
+    If Not IsEmpty(ResponseFormatJson) Then
+        AppendOptionalRawJson body, "response_format", ResponseFormatJson
+    End If
+    
+    If Not IsEmpty(ToolsJson) Then
+        AppendOptionalRawJson body, "tools", ToolsJson
+    End If
+    
+    If Not IsEmpty(ToolChoiceJson) Then
+        AppendOptionalRawJson body, "tool_choice", ToolChoiceJson
+    End If
+    
     AppendOptionalJsonString body, "reasoning_effort", ReasoningEffort
     AppendOptionalJsonBoolean body, "store", Store
-    AppendOptionalRawJson body, "metadata", MetadataJson
-    AppendOptionalJsonBoolean body, "parallel_tool_calls", ParallelToolCalls
+    
+    If Not IsEmpty(MetadataJson) Then
+        AppendOptionalRawJson body, "metadata", MetadataJson
+    End If
+    
+    If Not IsEmpty(ParallelToolCalls) Then
+        AppendOptionalJsonBoolean body, "parallel_tool_calls", ParallelToolCalls
+    End If
     
     body = body & "}"
-    
-    Debug.Print "===== REQUEST JSON BEGIN ====="
-    Debug.Print body
-    Debug.Print "===== REQUEST JSON END ====="
     
     Set CreateChatCompletion = PostJson(ENDPOINT_CHAT_COMPLETIONS, body)
 End Function
