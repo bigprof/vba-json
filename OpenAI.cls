@@ -21,19 +21,8 @@ Private mBaseUrl As String
 Private mOrganization As String
 Private mProject As String
 
-Private mTimeoutResolve As Long
-Private mTimeoutConnect As Long
-Private mTimeoutSend As Long
-Private mTimeoutReceive As Long
-
 Private Sub Class_Initialize()
     mBaseUrl = DEFAULT_BASE_URL
-    
-    ' Timeouts are in milliseconds
-    mTimeoutResolve = 30000
-    mTimeoutConnect = 30000
-    mTimeoutSend = 30000
-    mTimeoutReceive = 120000
 End Sub
 
 Public Property Get ApiKey() As String
@@ -50,6 +39,7 @@ End Property
 
 Public Property Let BaseUrl(ByVal value As String)
     value = Trim$(value)
+    
     If LenB(value) <> 0 Then
         If Right$(value, 1) = "/" Then
             value = Left$(value, Len(value) - 1)
@@ -74,62 +64,27 @@ Public Property Let Project(ByVal value As String)
     mProject = Trim$(value)
 End Property
 
-Public Property Get TimeoutResolve() As Long
-    TimeoutResolve = mTimeoutResolve
-End Property
-
-Public Property Let TimeoutResolve(ByVal value As Long)
-    mTimeoutResolve = value
-End Property
-
-Public Property Get TimeoutConnect() As Long
-    TimeoutConnect = mTimeoutConnect
-End Property
-
-Public Property Let TimeoutConnect(ByVal value As Long)
-    mTimeoutConnect = value
-End Property
-
-Public Property Get TimeoutSend() As Long
-    TimeoutSend = mTimeoutSend
-End Property
-
-Public Property Let TimeoutSend(ByVal value As Long)
-    mTimeoutSend = value
-End Property
-
-Public Property Get TimeoutReceive() As Long
-    TimeoutReceive = mTimeoutReceive
-End Property
-
-Public Property Let TimeoutReceive(ByVal value As Long)
-    mTimeoutReceive = value
-End Property
-
 Public Function CreateChatCompletionSimple( _
     ByVal Model As String, _
     ByVal DeveloperPrompt As String, _
-    ByVal UserPrompt As String, _
-    Optional ByVal Temperature As Variant, _
-    Optional ByVal MaxCompletionTokens As Variant, _
-    Optional ByVal Verbosity As Variant, _
-    Optional ByVal ReasoningEffort As Variant _
+    ByVal UserPrompt As String _
 ) As JsonData
     
-    Dim Messages As Collection
+    Dim body As String
     
-    Set Messages = New Collection
-    Messages.Add OpenAIMessageDeveloper(DeveloperPrompt)
-    Messages.Add OpenAIMessageUser(UserPrompt)
+    ValidateConfiguration
     
-    Set CreateChatCompletionSimple = CreateChatCompletion( _
-        Model:=Model, _
-        Messages:=Messages, _
-        Temperature:=Temperature, _
-        MaxCompletionTokens:=MaxCompletionTokens, _
-        Verbosity:=Verbosity, _
-        ReasoningEffort:=ReasoningEffort _
-    )
+    body = "{""model"":" & JsonString(Model) & _
+           ",""messages"":[" & _
+           "{""role"":""developer"",""content"":" & JsonString(DeveloperPrompt) & "}," & _
+           "{""role"":""user"",""content"":" & JsonString(UserPrompt) & "}" & _
+           "]}"
+    
+    Debug.Print "===== REQUEST JSON BEGIN ====="
+    Debug.Print body
+    Debug.Print "===== REQUEST JSON END ====="
+    
+    Set CreateChatCompletionSimple = PostJson(ENDPOINT_CHAT_COMPLETIONS, body)
 End Function
 
 Public Function CreateChatCompletion( _
@@ -147,72 +102,37 @@ Public Function CreateChatCompletion( _
     Optional ByVal ParallelToolCalls As Variant _
 ) As JsonData
     
-    Dim Body As String
+    Dim body As String
     
     ValidateConfiguration
     ValidateCreateChatCompletionInputs Model, Messages
     
-    Body = "{"
-    Body = Body & """model"":" & JsonString(Model)
-    Body = Body & ",""messages"":" & CollectionToJsonArray(Messages)
+    body = "{"
+    body = body & """model"":" & JsonString(Model)
+    body = body & ",""messages"":" & CollectionToJsonArray(Messages)
     
-    If Not IsEmpty(Temperature) Then
-        Body = Body & ",""temperature"":" & JsonNumber(CDbl(Temperature))
-    End If
+    AppendOptionalJsonDouble body, "temperature", Temperature
+    AppendOptionalJsonLong body, "max_completion_tokens", MaxCompletionTokens
+    AppendOptionalJsonString body, "verbosity", Verbosity
+    AppendOptionalRawJson body, "response_format", ResponseFormatJson
+    AppendOptionalRawJson body, "tools", ToolsJson
+    AppendOptionalRawJson body, "tool_choice", ToolChoiceJson
+    AppendOptionalJsonString body, "reasoning_effort", ReasoningEffort
+    AppendOptionalJsonBoolean body, "store", Store
+    AppendOptionalRawJson body, "metadata", MetadataJson
+    AppendOptionalJsonBoolean body, "parallel_tool_calls", ParallelToolCalls
     
-    If Not IsEmpty(MaxCompletionTokens) Then
-        Body = Body & ",""max_completion_tokens"":" & CStr(CLng(MaxCompletionTokens))
-    End If
+    body = body & "}"
     
-    If Not IsEmpty(Verbosity) Then
-        Body = Body & ",""verbosity"":" & JsonString(CStr(Verbosity))
-    End If
+    Debug.Print "===== REQUEST JSON BEGIN ====="
+    Debug.Print body
+    Debug.Print "===== REQUEST JSON END ====="
     
-    If Not IsEmpty(ResponseFormatJson) Then
-        If LenB(CStr(ResponseFormatJson)) <> 0 Then
-            Body = Body & ",""response_format"":" & CStr(ResponseFormatJson)
-        End If
-    End If
-    
-    If Not IsEmpty(ToolsJson) Then
-        If LenB(CStr(ToolsJson)) <> 0 Then
-            Body = Body & ",""tools"":" & CStr(ToolsJson)
-        End If
-    End If
-    
-    If Not IsEmpty(ToolChoiceJson) Then
-        If LenB(CStr(ToolChoiceJson)) <> 0 Then
-            Body = Body & ",""tool_choice"":" & CStr(ToolChoiceJson)
-        End If
-    End If
-    
-    If Not IsEmpty(ReasoningEffort) Then
-        If LenB(CStr(ReasoningEffort)) <> 0 Then
-            Body = Body & ",""reasoning_effort"":" & JsonString(CStr(ReasoningEffort))
-        End If
-    End If
-    
-    If Not IsEmpty(Store) Then
-        Body = Body & ",""store"":" & JsonBoolean(CBool(Store))
-    End If
-    
-    If Not IsEmpty(MetadataJson) Then
-        If LenB(CStr(MetadataJson)) <> 0 Then
-            Body = Body & ",""metadata"":" & CStr(MetadataJson)
-        End If
-    End If
-    
-    If Not IsEmpty(ParallelToolCalls) Then
-        Body = Body & ",""parallel_tool_calls"":" & JsonBoolean(CBool(ParallelToolCalls))
-    End If
-    
-    Body = Body & "}"
-    
-    Set CreateChatCompletion = PostJson(ENDPOINT_CHAT_COMPLETIONS, Body)
+    Set CreateChatCompletion = PostJson(ENDPOINT_CHAT_COMPLETIONS, body)
 End Function
 
-Private Function PostJson(ByVal RelativeUrl As String, ByVal Body As String) As JsonData
-    Dim http As MSXML2.ServerXMLHTTP
+Private Function PostJson(ByVal RelativeUrl As String, ByVal body As String) As JsonData
+    Dim http As MSXML2.XMLHTTP60
     Dim url As String
     Dim responseText As String
     Dim parsed As JsonData
@@ -220,8 +140,7 @@ Private Function PostJson(ByVal RelativeUrl As String, ByVal Body As String) As 
     
     url = mBaseUrl & RelativeUrl
     
-    Set http = New MSXML2.ServerXMLHTTP
-    http.setTimeouts mTimeoutResolve, mTimeoutConnect, mTimeoutSend, mTimeoutReceive
+    Set http = New MSXML2.XMLHTTP60
     
     On Error GoTo TransportErr
     
@@ -237,7 +156,7 @@ Private Function PostJson(ByVal RelativeUrl As String, ByVal Body As String) As 
         http.setRequestHeader "OpenAI-Project", mProject
     End If
     
-    http.send Body
+    http.send body
     
     responseText = http.responseText
     
@@ -254,28 +173,37 @@ Private Function PostJson(ByVal RelativeUrl As String, ByVal Body As String) As 
         
         If LenB(apiError) <> 0 Then
             Err.Raise vbObjectError + 1101, "OpenAI.PostJson", _
-                "HTTP " & CStr(http.Status) & " " & http.statusText & vbCrLf & apiError
+                "HTTP " & CStr(http.Status) & " " & http.statusText & vbCrLf & _
+                apiError
         Else
             Err.Raise vbObjectError + 1102, "OpenAI.PostJson", _
-                "HTTP " & CStr(http.Status) & " " & http.statusText & vbCrLf & responseText
+                "HTTP " & CStr(http.Status) & " " & http.statusText & vbCrLf & _
+                responseText
         End If
     End If
     
     If parsed Is Nothing Then
         Err.Raise vbObjectError + 1103, "OpenAI.PostJson", _
-            "The response body could not be parsed as JSON." & vbCrLf & responseText
+            "The response body could not be parsed as JSON." & vbCrLf & _
+            responseText
     End If
     
     If Not parsed.IsValid Then
         Err.Raise vbObjectError + 1104, "OpenAI.PostJson", _
-            "The response body is not valid JSON." & vbCrLf & responseText
+            "The response body is not valid JSON." & vbCrLf & _
+            responseText
     End If
     
     Set PostJson = parsed
     Exit Function
 
 TransportErr:
-    Err.Raise Err.Number, "OpenAI.PostJson", Err.Description
+    Err.Raise Err.Number, "OpenAI.PostJson", _
+        "Transport error during HTTPS request." & vbCrLf & _
+        "URL: " & url & vbCrLf & _
+        "Err.Number: " & CStr(Err.Number) & vbCrLf & _
+        "Hex: 0x" & Right$("00000000" & Hex$(Err.Number), 8) & vbCrLf & _
+        "Description: " & Err.Description
 End Function
 
 Private Sub ValidateConfiguration()
@@ -296,5 +224,83 @@ Private Sub ValidateCreateChatCompletionInputs(ByVal Model As String, ByVal Mess
     If Messages.Count = 0 Then
         Err.Raise vbObjectError + 1112, "OpenAI.CreateChatCompletion", "Messages collection must not be empty."
     End If
+End Sub
+
+Private Sub AppendOptionalRawJson(ByRef body As String, ByVal fieldName As String, ByVal value As Variant)
+    If IsEmpty(value) Then Exit Sub
+    If IsNull(value) Then Exit Sub
+    
+    On Error GoTo BadValue
+    
+    If VarType(value) = vbString Then
+        If LenB(CStr(value)) = 0 Then Exit Sub
+        body = body & ",""" & fieldName & """:" & CStr(value)
+        Exit Sub
+    End If
+    
+    Err.Raise vbObjectError + 2001, "OpenAI.AppendOptionalRawJson", _
+        "Optional field '" & fieldName & "' must be a JSON string."
+    Exit Sub
+
+BadValue:
+    Err.Raise vbObjectError + 2002, "OpenAI.AppendOptionalRawJson", _
+        "Invalid optional field '" & fieldName & "': " & Err.Description
+End Sub
+
+Private Sub AppendOptionalJsonString(ByRef body As String, ByVal fieldName As String, ByVal value As Variant)
+    If IsEmpty(value) Then Exit Sub
+    If IsNull(value) Then Exit Sub
+    
+    On Error GoTo BadValue
+    
+    If LenB(Trim$(CStr(value))) = 0 Then Exit Sub
+    body = body & ",""" & fieldName & """:" & JsonString(CStr(value))
+    Exit Sub
+
+BadValue:
+    Err.Raise vbObjectError + 2003, "OpenAI.AppendOptionalJsonString", _
+        "Invalid optional string field '" & fieldName & "': " & Err.Description
+End Sub
+
+Private Sub AppendOptionalJsonBoolean(ByRef body As String, ByVal fieldName As String, ByVal value As Variant)
+    If IsEmpty(value) Then Exit Sub
+    If IsNull(value) Then Exit Sub
+    
+    On Error GoTo BadValue
+    
+    body = body & ",""" & fieldName & """:" & JsonBoolean(CBool(value))
+    Exit Sub
+
+BadValue:
+    Err.Raise vbObjectError + 2004, "OpenAI.AppendOptionalJsonBoolean", _
+        "Invalid optional boolean field '" & fieldName & "': " & Err.Description
+End Sub
+
+Private Sub AppendOptionalJsonLong(ByRef body As String, ByVal fieldName As String, ByVal value As Variant)
+    If IsEmpty(value) Then Exit Sub
+    If IsNull(value) Then Exit Sub
+    
+    On Error GoTo BadValue
+    
+    body = body & ",""" & fieldName & """:" & CStr(CLng(value))
+    Exit Sub
+
+BadValue:
+    Err.Raise vbObjectError + 2005, "OpenAI.AppendOptionalJsonLong", _
+        "Invalid optional numeric field '" & fieldName & "': " & Err.Description
+End Sub
+
+Private Sub AppendOptionalJsonDouble(ByRef body As String, ByVal fieldName As String, ByVal value As Variant)
+    If IsEmpty(value) Then Exit Sub
+    If IsNull(value) Then Exit Sub
+    
+    On Error GoTo BadValue
+    
+    body = body & ",""" & fieldName & """:" & JsonNumber(CDbl(value))
+    Exit Sub
+
+BadValue:
+    Err.Raise vbObjectError + 2006, "OpenAI.AppendOptionalJsonDouble", _
+        "Invalid optional numeric field '" & fieldName & "': " & Err.Description
 End Sub
 

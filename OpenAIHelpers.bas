@@ -1,82 +1,86 @@
 Attribute VB_Name = "OpenAIHelpers"
 Option Explicit
 
-Public Function OpenAIMessageDeveloper(ByVal Text As String) As String
-    OpenAIMessageDeveloper = BuildMessageText("developer", Text)
+Public Function OpenAIMessageDeveloper(ByVal text As String) As String
+    OpenAIMessageDeveloper = BuildMessageText("developer", text)
 End Function
 
-Public Function OpenAIMessageUser(ByVal Text As String) As String
-    OpenAIMessageUser = BuildMessageText("user", Text)
+Public Function OpenAIMessageUser(ByVal text As String) As String
+    OpenAIMessageUser = BuildMessageText("user", text)
 End Function
 
-Public Function OpenAIMessageAssistant(ByVal Text As String) As String
-    OpenAIMessageAssistant = BuildMessageText("assistant", Text)
+Public Function OpenAIMessageAssistant(ByVal text As String) As String
+    OpenAIMessageAssistant = BuildMessageText("assistant", text)
 End Function
 
-Public Function OpenAIMessageText(ByVal Role As String, ByVal Text As String) As String
-    OpenAIMessageText = BuildMessageText(Role, Text)
+Public Function OpenAIMessageText(ByVal Role As String, ByVal text As String) As String
+    OpenAIMessageText = BuildMessageText(Role, text)
 End Function
 
-Public Function BuildMessageText(ByVal Role As String, ByVal Text As String) As String
+Public Function BuildMessageText(ByVal Role As String, ByVal text As String) As String
     BuildMessageText = _
         "{" & _
             """role"":" & JsonString(Role) & "," & _
-            """content"":" & JsonString(Text) & _
+            """content"":" & JsonString(text) & _
         "}"
 End Function
 
-Public Function JsonString(ByVal Value As String) As String
+Public Function JsonString(ByVal value As String) As String
     Dim i As Long
     Dim ch As String
-    Dim code As Long
+    Dim code As Integer
     Dim s As String
     
     s = """"
     
-    For i = 1 To Len(Value)
-        ch = Mid$(Value, i, 1)
-        Select Case ch
-            Case "\"
-                s = s & "\\"
-            Case """"
+    For i = 1 To Len(value)
+        ch = Mid$(value, i, 1)
+        code = AscW(ch)
+        
+        Select Case code
+            Case 34
                 s = s & "\"""
-            Case vbBack
+            Case 92
+                s = s & "\\"
+            Case 8
                 s = s & "\b"
-            Case vbFormFeed
-                s = s & "\f"
-            Case vbLf
-                s = s & "\n"
-            Case vbCr
-                s = s & "\r"
-            Case vbTab
+            Case 9
                 s = s & "\t"
+            Case 10
+                s = s & "\n"
+            Case 12
+                s = s & "\f"
+            Case 13
+                s = s & "\r"
+            Case 0 To 31
+                s = s & "\u" & Right$("0000" & Hex$(code), 4)
             Case Else
-                code = Asc(ch)
-                If code >= 0 And code <= 31 Then
-                    s = s & "\u" & Right$("0000" & Hex$(code), 4)
-                Else
-                    s = s & ch
-                End If
+                s = s & ch
         End Select
-    Next
+    Next i
     
     s = s & """"
     JsonString = s
 End Function
-
-Public Function JsonBoolean(ByVal Value As Boolean) As String
-    If Value Then
+Public Function JsonBoolean(ByVal value As Boolean) As String
+    If value Then
         JsonBoolean = "true"
     Else
         JsonBoolean = "false"
     End If
 End Function
 
-Public Function JsonNumber(ByVal Value As Double) As String
+Public Function JsonNumber(ByVal value As Double) As String
     Dim s As String
     
-    s = Trim$(str$(Value))
+    s = Trim$(str$(value))
     s = Replace$(s, ",", ".")
+    
+    If Left$(s, 1) = "." Then
+        s = "0" & s
+    ElseIf Left$(s, 2) = "-." Then
+        s = "-0" & Mid$(s, 2)
+    End If
     
     JsonNumber = s
 End Function
@@ -187,7 +191,7 @@ End Function
 
 Public Function OpenAIResponseFormatJsonSchema( _
     ByVal Name As String, _
-    ByVal SchemaJson As String, _
+    ByVal schemaJson As String, _
     Optional ByVal Description As String = "", _
     Optional ByVal Strict As Boolean = False _
 ) As String
@@ -203,7 +207,7 @@ Public Function OpenAIResponseFormatJsonSchema( _
         s = s & ",""description"":" & JsonString(Description)
     End If
     
-    s = s & ",""schema"":" & SchemaJson
+    s = s & ",""schema"":" & schemaJson
     s = s & ",""strict"":" & JsonBoolean(Strict)
     s = s & "}"
     s = s & "}"

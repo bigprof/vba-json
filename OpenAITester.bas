@@ -1,6 +1,52 @@
 Attribute VB_Name = "OpenAITester"
 Option Explicit
 
+Public Sub TestOpenAISimple()
+    Dim client As OpenAI
+    Dim result As JsonData
+    
+    Set client = New OpenAI
+    client.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    Set result = client.CreateChatCompletionSimple( _
+        "gpt-5.4", _
+        "You are a helpful assistant.", _
+        "Write a short haiku about VB6 and APIs." _
+    )
+    
+    'Debug.Print result.json
+End Sub
+
+Public Sub TestOpenAIAdvanced()
+    Dim client As OpenAI
+    Dim msgs As Collection
+    Dim result As JsonData
+    
+    Set client = New OpenAI
+    client.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    Set msgs = New Collection
+    msgs.Add "{""role"":""developer"",""content"":""You are a concise assistant.""}"
+    msgs.Add "{""role"":""user"",""content"":""What is COM?""}"
+    msgs.Add "{""role"":""assistant"",""content"":""COM stands for Component Object Model.""}"
+    msgs.Add "{""role"":""user"",""content"":""Now explain it for a beginner in one sentence.""}"
+    
+    Set result = client.CreateChatCompletion( _
+        "gpt-5.4", _
+        msgs, _
+        Empty, _
+        "100", _
+        "low", _
+        Empty, _
+        "[{""type"":""function"",""function"":{""name"":""dummy_tool"",""description"":""Dummy tool for testing."",""parameters"":{""type"":""object"",""properties"":{}}}}]", _
+        Empty, _
+        Empty, _
+        True, _
+        Empty, _
+        False _
+    )
+End Sub
+
 Public Sub TestOpenAI_SimpleText()
     Dim ai As OpenAI
     Dim resp As JsonData
@@ -14,10 +60,7 @@ Public Sub TestOpenAI_SimpleText()
     Set resp = ai.CreateChatCompletionSimple( _
         Model:="gpt-5.4", _
         DeveloperPrompt:="You are a helpful assistant.", _
-        UserPrompt:="Write a short haiku about VB6 and APIs.", _
-        Temperature:=0.7, _
-        MaxCompletionTokens:=120, _
-        Verbosity:="low" _
+        UserPrompt:="Write a short haiku about VB6 and APIs." _
     )
     
     Debug.Print String(70, "=")
@@ -39,25 +82,31 @@ End Sub
 Public Sub TestOpenAI_MultiTurn()
     Dim ai As OpenAI
     Dim resp As JsonData
-    Dim messages As Collection
+    Dim Messages As Collection
     
     On Error GoTo EH
     
     Set ai = New OpenAI
     ai.ApiKey = Environ$("OPENAI_API_KEY")
     
-    Set messages = New Collection
-    messages.Add OpenAIMessageDeveloper("You are a concise assistant.")
-    messages.Add OpenAIMessageUser("What is COM?")
-    messages.Add OpenAIMessageAssistant("COM stands for Component Object Model.")
-    messages.Add OpenAIMessageUser("Now explain it for a beginner in one sentence.")
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("You are a concise assistant.")
+    Messages.Add OpenAIMessageUser("What is COM?")
+    Messages.Add OpenAIMessageAssistant("COM stands for Component Object Model.")
+    Messages.Add OpenAIMessageUser("Now explain it for a beginner in one sentence.")
     
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
-        messages:=messages, _
-        Temperature:=0.2, _
+        Messages:=Messages, _
+        Temperature:=1, _
         MaxCompletionTokens:=100, _
-        Verbosity:="low" _
+        Verbosity:="low", _
+        ResponseFormatJson:=Empty, _
+        ToolsJson:=Empty, _
+        ToolChoiceJson:=Empty, _
+        MetadataJson:=Empty, _
+        ReasoningEffort:="low", _
+        ParallelToolCalls:=Empty _
     )
     
     Debug.Print String(70, "=")
@@ -74,7 +123,7 @@ End Sub
 Public Sub TestOpenAI_JsonObject()
     Dim ai As OpenAI
     Dim resp As JsonData
-    Dim messages As Collection
+    Dim Messages As Collection
     Dim responseFormat As String
     
     On Error GoTo EH
@@ -82,18 +131,25 @@ Public Sub TestOpenAI_JsonObject()
     Set ai = New OpenAI
     ai.ApiKey = Environ$("OPENAI_API_KEY")
     
-    Set messages = New Collection
-    messages.Add OpenAIMessageDeveloper("Return valid JSON only.")
-    messages.Add OpenAIMessageUser("Return an object with keys title and year for The Matrix.")
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("Return valid JSON only.")
+    Messages.Add OpenAIMessageUser("Return an object with keys title and year for The Matrix.")
     
     responseFormat = OpenAIResponseFormatJsonObject()
     
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
-        messages:=messages, _
+        Messages:=Messages, _
+        Temperature:=Empty, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=responseFormat _
+        ResponseFormatJson:=responseFormat, _
+        ToolsJson:=Empty, _
+        ToolChoiceJson:=Empty, _
+        ReasoningEffort:="low", _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
+        ParallelToolCalls:=Empty _
     )
     
     Debug.Print String(70, "=")
@@ -110,7 +166,7 @@ End Sub
 Public Sub TestOpenAI_JsonSchema()
     Dim ai As OpenAI
     Dim resp As JsonData
-    Dim messages As Collection
+    Dim Messages As Collection
     Dim schemaJson As String
     Dim responseFormat As String
     
@@ -137,16 +193,23 @@ Public Sub TestOpenAI_JsonSchema()
         Strict:=True _
     )
     
-    Set messages = New Collection
-    messages.Add OpenAIMessageDeveloper("Return only data that matches the schema.")
-    messages.Add OpenAIMessageUser("Provide the title and year for The Matrix.")
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("Return only data that matches the schema.")
+    Messages.Add OpenAIMessageUser("Provide the title and year for The Matrix.")
     
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
-        messages:=messages, _
+        Messages:=Messages, _
+        Temperature:=Empty, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=responseFormat _
+        ResponseFormatJson:=responseFormat, _
+        ToolsJson:=Empty, _
+        ToolChoiceJson:=Empty, _
+        ReasoningEffort:="low", _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
+        ParallelToolCalls:=Empty _
     )
     
     Debug.Print String(70, "=")
@@ -159,12 +222,11 @@ Public Sub TestOpenAI_JsonSchema()
 EH:
     Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
 End Sub
-
 Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
     Dim ai As OpenAI
     Dim resp As JsonData
-    Dim messages As Collection
-    Dim toolsJson As String
+    Dim Messages As Collection
+    Dim ToolsJson As String
     Dim toolCalls As JsonData
     
     On Error GoTo EH
@@ -172,7 +234,7 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
     Set ai = New OpenAI
     ai.ApiKey = Environ$("OPENAI_API_KEY")
     
-    toolsJson = _
+    ToolsJson = _
         "[" & _
             "{" & _
                 """type"":""function""," & _
@@ -185,7 +247,7 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
                             """location"":{""type"":""string""}," & _
                             """unit"":{""type"":""string"",""enum"":[""celsius"",""fahrenheit""]}" & _
                         "}," & _
-                        """required"":[""location""]," & _
+                        """required"":[""location"",""unit""]," & _
                         """additionalProperties"":false" & _
                     "}," & _
                     """strict"":true" & _
@@ -193,14 +255,21 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
             "}" & _
         "]"
     
-    Set messages = New Collection
-    messages.Add OpenAIMessageUser("What is the weather in Boston today?")
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageUser("What is the weather in Boston today?")
     
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
-        messages:=messages, _
-        toolsJson:=toolsJson, _
+        Messages:=Messages, _
+        Temperature:=Empty, _
+        MaxCompletionTokens:=Empty, _
+        Verbosity:=Empty, _
+        ResponseFormatJson:=Empty, _
+        ToolsJson:=ToolsJson, _
         ToolChoiceJson:=OpenAIToolChoiceAuto(), _
+        ReasoningEffort:=Empty, _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
         ParallelToolCalls:=False _
     )
     
