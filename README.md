@@ -1,4 +1,3 @@
-```md
 # VB6 OpenAI + JsonData
 
 A small VB6 client for working with JSON and the OpenAI Chat Completions API.
