@@ -74,8 +74,6 @@ Public Sub Main()
     Debug.Print "Done."
     
     TestOpenAISimple
-    TestOpenAIAdvanced
-    TestOpenAI_SimpleText
     TestOpenAI_MultiTurn
     TestOpenAI_JsonSchema
     TestOpenAI_JsonObject

@@ -14,69 +14,7 @@ Public Sub TestOpenAISimple()
         "Write a short haiku about VB6 and APIs." _
     )
     
-    'Debug.Print result.json
-End Sub
-
-Public Sub TestOpenAIAdvanced()
-    Dim client As OpenAI
-    Dim msgs As Collection
-    Dim result As JsonData
-    
-    Set client = New OpenAI
-    client.ApiKey = Environ$("OPENAI_API_KEY")
-    
-    Set msgs = New Collection
-    msgs.Add "{""role"":""developer"",""content"":""You are a concise assistant.""}"
-    msgs.Add "{""role"":""user"",""content"":""What is COM?""}"
-    msgs.Add "{""role"":""assistant"",""content"":""COM stands for Component Object Model.""}"
-    msgs.Add "{""role"":""user"",""content"":""Now explain it for a beginner in one sentence.""}"
-    
-    Set result = client.CreateChatCompletion( _
-        "gpt-5.4", _
-        msgs, _
-        Empty, _
-        "100", _
-        "low", _
-        Empty, _
-        "[{""type"":""function"",""function"":{""name"":""dummy_tool"",""description"":""Dummy tool for testing."",""parameters"":{""type"":""object"",""properties"":{}}}}]", _
-        Empty, _
-        Empty, _
-        True, _
-        Empty, _
-        False _
-    )
-End Sub
-
-Public Sub TestOpenAI_SimpleText()
-    Dim ai As OpenAI
-    Dim resp As JsonData
-    Dim text As String
-    
-    On Error GoTo EH
-    
-    Set ai = New OpenAI
-    ai.ApiKey = Environ$("OPENAI_API_KEY")
-    
-    Set resp = ai.CreateChatCompletionSimple( _
-        Model:="gpt-5.4", _
-        DeveloperPrompt:="You are a helpful assistant.", _
-        UserPrompt:="Write a short haiku about VB6 and APIs." _
-    )
-    
-    Debug.Print String(70, "=")
-    Debug.Print "Simple text response"
-    Debug.Print String(70, "=")
-    Debug.Print "finish_reason = "; OpenAIExtractFinishReason(resp)
-    Debug.Print "content:"
-    Debug.Print OpenAIExtractText(resp)
-    Debug.Print
-    Debug.Print "raw response JSON:"
-    Debug.Print resp.ToJSON("  ")
-    
-    Exit Sub
-
-EH:
-    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+    Debug.Print OpenAIExtractText(result)
 End Sub
 
 Public Sub TestOpenAI_MultiTurn()
@@ -104,11 +42,7 @@ Public Sub TestOpenAI_MultiTurn()
         ReasoningEffort:="low" _
     )
     
-    Debug.Print String(70, "=")
-    Debug.Print "Multi-turn response"
-    Debug.Print String(70, "=")
     Debug.Print OpenAIExtractText(resp)
-    
     Exit Sub
 
 EH:
@@ -135,21 +69,11 @@ Public Sub TestOpenAI_JsonObject()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=responseFormat, _
-        ToolsJson:=Empty, _
-        ToolChoiceJson:=Empty, _
-        ReasoningEffort:="low", _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
-        ParallelToolCalls:=Empty _
+        ResponseFormatJson:=responseFormat _
     )
     
-    Debug.Print String(70, "=")
-    Debug.Print "JSON object response"
-    Debug.Print String(70, "=")
     Debug.Print OpenAIExtractText(resp)
     
     Exit Sub
@@ -195,21 +119,11 @@ Public Sub TestOpenAI_JsonSchema()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=responseFormat, _
-        ToolsJson:=Empty, _
-        ToolChoiceJson:=Empty, _
-        ReasoningEffort:="low", _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
-        ParallelToolCalls:=Empty _
+        ResponseFormatJson:=responseFormat _
     )
     
-    Debug.Print String(70, "=")
-    Debug.Print "JSON schema response"
-    Debug.Print String(70, "=")
     Debug.Print OpenAIExtractText(resp)
     
     Exit Sub
@@ -256,35 +170,21 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
-        MaxCompletionTokens:=Empty, _
-        Verbosity:=Empty, _
-        ResponseFormatJson:=Empty, _
         ToolsJson:=ToolsJson, _
         ToolChoiceJson:=OpenAIToolChoiceAuto(), _
-        ReasoningEffort:=Empty, _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
         ParallelToolCalls:=False _
     )
     
     Set toolCalls = OpenAIExtractToolCalls(resp)
     
-    Debug.Print String(70, "=")
-    Debug.Print "Tool call request-only response"
-    Debug.Print String(70, "=")
     Debug.Print "finish_reason = "; OpenAIExtractFinishReason(resp)
-    
     If Not toolCalls Is Nothing Then
         If toolCalls.IsValid Then
-            Debug.Print "tool_calls detected"
             Debug.Print toolCalls.ToJSON("  ")
         Else
-            Debug.Print "no tool_calls"
             Debug.Print OpenAIExtractText(resp)
         End If
     Else
-        Debug.Print "no tool_calls"
         Debug.Print OpenAIExtractText(resp)
     End If
     
