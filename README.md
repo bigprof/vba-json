@@ -67,16 +67,10 @@ Public Sub TestOpenAI_MultiTurn()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
+        Temperature:=1, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=Empty, _
-        ToolsJson:=Empty, _
-        ToolChoiceJson:=Empty, _
-        ReasoningEffort:="low", _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
-        ParallelToolCalls:=Empty _
+        ReasoningEffort:="low" _
     )
     
     Debug.Print OpenAIExtractText(resp)
@@ -129,16 +123,9 @@ Public Sub TestOpenAI_JsonSchema()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=responseFormat, _
-        ToolsJson:=Empty, _
-        ToolChoiceJson:=Empty, _
-        ReasoningEffort:="low", _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
-        ParallelToolCalls:=Empty _
+        ResponseFormatJson:=responseFormat _
     )
     
     Debug.Print OpenAIExtractText(resp)
@@ -174,16 +161,9 @@ Public Sub TestOpenAI_JsonObject()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=responseFormat, _
-        ToolsJson:=Empty, _
-        ToolChoiceJson:=Empty, _
-        ReasoningEffort:="low", _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
-        ParallelToolCalls:=Empty _
+        ResponseFormatJson:=responseFormat _
     )
     
     Debug.Print OpenAIExtractText(resp)
@@ -238,15 +218,8 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
     Set resp = ai.CreateChatCompletion( _
         Model:="gpt-5.4", _
         Messages:=Messages, _
-        Temperature:=Empty, _
-        MaxCompletionTokens:=Empty, _
-        Verbosity:=Empty, _
-        ResponseFormatJson:=Empty, _
         ToolsJson:=ToolsJson, _
         ToolChoiceJson:=OpenAIToolChoiceAuto(), _
-        ReasoningEffort:=Empty, _
-        Store:=Empty, _
-        MetadataJson:=Empty, _
         ParallelToolCalls:=False _
     )
     
@@ -274,6 +247,8 @@ End Sub
 
 Your VB6 wrapper should follow these rules:
 
+- Optional parameters default to `Empty` when not provided, so you only need to pass parameters you actually want to set.
+- `ReasoningEffort` defaults to `"low"` and `Store` defaults to `False`; override them explicitly if needed.
 - Omit optional JSON fields entirely when they are not being used.
 - Do **not** send `Empty` values as raw JSON fields.
 - Serialize floating-point numbers with a leading zero, so `0.2` is emitted as `0.2`, not `.2`.
