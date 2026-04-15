@@ -1,169 +1,293 @@
-# Parse JSON strings in VBA (Visual Basic for Applications)
+```md
+# VB6 OpenAI + JsonData
 
-## Installation
+A small VB6 client for working with JSON and the OpenAI Chat Completions API.
 
-1. Save the `Json.bas` and `JsonData.cls` files somewhere in your PC
-2. Open the Visual Basic Editor
-3. Choose the `File` > `Import File...` menu item
-4. Import the two files saved in point 1.
-5. You can safely delete the two files saved in point 1.
+## Notes
 
-## Parsing JSON strings
+- These examples use the **Chat Completions API**.
+- OpenAI recommends the **Responses API** for new text-generation builds, but Chat Completions remains available and is what this VB6 client currently targets. ([platform.openai.com](https://platform.openai.com/docs/guides/chat-completions?utm_source=openai))
+- For Chat Completions, `response_format` is a JSON object, `tools` is a JSON array, `tool_choice` is a string or JSON object, and `metadata` is a JSON object. `parallel_tool_calls` is an optional boolean, and `temperature` defaults to `1`. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
+- With GPT-5-family Chat Completions usage, some combinations are model-dependent. In practice, unsupported fields should be omitted rather than sent as invalid placeholders. This matches the API reference behavior for optional request fields. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
 
-Use the `ParseJSON` function to parse a string that contains data in JSON format.
+## Setup
 
-This function always return a JsonData object.
+Set your API key in an environment variable:
+
+```bat
+set OPENAI_API_KEY=your_api_key_here
+```
+
+Then in VB6:
 
 ```vb
-Dim data As JsonData
-
-Set data = ParseJSON("some json")
+Dim ai As OpenAI
+Set ai = New OpenAI
+ai.ApiKey = Environ$("OPENAI_API_KEY")
 ```
 
-You can check its type with:
-
-- `data.IsValid` returns `true` if the data is valid, `false` otherwise
-- `data.IsScalar` returns `true` if the data is scalar (that is, `null`, a boolean, a number, a string), `false` otherwise
-- `data.IsArray` returns `true` if the data is an array, `false` otherwise
-- `data.IsObject` returns `true` if the data is an object, `false` otherwise
-- `data.DataType` returns:
-  - `JSONDATATYPE_SCALAR` if the data is scalar
-  - `JSONDATATYPE_ARRAY` if the data is an array
-  - `JSONDATATYPE_OBJECT` if the data is an object
-  - `JSONDATATYPE_INVALID` if the data is not valid
-
-## Invalid JSON
-
-You can check if a JSON is valid with `IsValid`:
+## Simple text example
 
 ```vb
-Dim data As JsonData
-
-Set data = ParseJSON("");
-' data.isValid is false
-
-Set data = ParseJSON("{");
-' data.isValid is false
-
-Set data = ParseJSON("invalid json");
-' data.isValid is false
+Public Sub TestOpenAISimple()
+    Dim client As OpenAI
+    Dim result As JsonData
+    
+    Set client = New OpenAI
+    client.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    Set result = client.CreateChatCompletionSimple( _
+        "gpt-5.4", _
+        "You are a helpful assistant.", _
+        "Write a short haiku about VB6 and APIs." _
+    )
+    
+    Debug.Print OpenAIExtractText(result)
+End Sub
 ```
 
-## Scalar types
-
-If `data.isScalar` returns `True` (or if `data.DataType` returns `JSONDATATYPE_SCALAR`), you can get the scalar value with `data.ScalarValue`.
-
-Example:
+## Multi-turn chat example
 
 ```vb
-Dim data As JsonData, value as Variant
+Public Sub TestOpenAI_MultiTurn()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim Messages As Collection
+    
+    On Error GoTo EH
+    
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("You are a concise assistant.")
+    Messages.Add OpenAIMessageUser("What is COM?")
+    Messages.Add OpenAIMessageAssistant("COM stands for Component Object Model.")
+    Messages.Add OpenAIMessageUser("Now explain it for a beginner in one sentence.")
+    
+    Set resp = ai.CreateChatCompletion( _
+        Model:="gpt-5.4", _
+        Messages:=Messages, _
+        Temperature:=Empty, _
+        MaxCompletionTokens:=100, _
+        Verbosity:="low", _
+        ResponseFormatJson:=Empty, _
+        ToolsJson:=Empty, _
+        ToolChoiceJson:=Empty, _
+        ReasoningEffort:="low", _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
+        ParallelToolCalls:=Empty _
+    )
+    
+    Debug.Print OpenAIExtractText(resp)
+    Exit Sub
 
-Set data = ParseJSON("null")
-If data.IsScalar Then
-    value = data.ScalarValue ' It's Variant/Null - check it with IsNull()
-End If
-
-Set data = ParseJSON("true")
-If data.IsScalar Then
-    value = data.ScalarValue ' It's True
-End If
-
-Set data = ParseJSON("123")
-If data.IsScalar Then
-    value = data.ScalarValue ' It's 123
-End If
-
-Set data = ParseJSON("""Ciao!""")
-If data.IsScalar Then
-    value = data.ScalarValue ' It's "Ciao!"
-End If
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
 ```
 
-## Arrays
+## Structured output with JSON Schema
 
-If `data.IsArray` returns `True` (or if `data.DataType` returns `JSONDATATYPE_ARRAY`), you can use the `ArrayLength` property and the `GetArrayItem()` method.
-
-Example:
+Chat Completions supports `response_format` with `json_schema`, which enforces a schema-based structured output format. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
 
 ```vb
-Dim data As JsonData, index As Long, item As JsonData
+Public Sub TestOpenAI_JsonSchema()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim Messages As Collection
+    Dim schemaJson As String
+    Dim responseFormat As String
+    
+    On Error GoTo EH
+    
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    schemaJson = _
+        "{" & _
+            """type"":""object""," & _
+            """properties"":{" & _
+                """title"":{""type"":""string""}," & _
+                """year"":{""type"":""integer""}" & _
+            "}," & _
+            """required"":[""title"",""year""]," & _
+            """additionalProperties"":false" & _
+        "}"
+    
+    responseFormat = OpenAIResponseFormatJsonSchema( _
+        Name:="movie_info", _
+        schemaJson:=schemaJson, _
+        Description:="Movie information", _
+        Strict:=True _
+    )
+    
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("Return only data that matches the schema.")
+    Messages.Add OpenAIMessageUser("Provide the title and year for The Matrix.")
+    
+    Set resp = ai.CreateChatCompletion( _
+        Model:="gpt-5.4", _
+        Messages:=Messages, _
+        Temperature:=Empty, _
+        MaxCompletionTokens:=100, _
+        Verbosity:="low", _
+        ResponseFormatJson:=responseFormat, _
+        ToolsJson:=Empty, _
+        ToolChoiceJson:=Empty, _
+        ReasoningEffort:="low", _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
+        ParallelToolCalls:=Empty _
+    )
+    
+    Debug.Print OpenAIExtractText(resp)
+    Exit Sub
 
-Set data = ParseJSON("[1, null, ""Hi"", true]")
-If data.IsArray Then
-    For index = 0 To data.ArrayLength - 1
-        Set item = data.GetArrayItem(index)
-        ' Work with item
-    Next
-End If
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
 ```
 
-If you try to access an unexisting array index, `GetArrayItem()` will return a `JsonData` object whose `IsValid` property is `False`:
+## JSON object mode
+
+Chat Completions also supports the older `json_object` response format, though `json_schema` is preferred when supported. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
 
 ```vb
-Dim data As JsonData, item As JsonData
+Public Sub TestOpenAI_JsonObject()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim Messages As Collection
+    Dim responseFormat As String
+    
+    On Error GoTo EH
+    
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("Return valid JSON only.")
+    Messages.Add OpenAIMessageUser("Return an object with keys title and year for The Matrix.")
+    
+    responseFormat = OpenAIResponseFormatJsonObject()
+    
+    Set resp = ai.CreateChatCompletion( _
+        Model:="gpt-5.4", _
+        Messages:=Messages, _
+        Temperature:=Empty, _
+        MaxCompletionTokens:=100, _
+        Verbosity:="low", _
+        ResponseFormatJson:=responseFormat, _
+        ToolsJson:=Empty, _
+        ToolChoiceJson:=Empty, _
+        ReasoningEffort:="low", _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
+        ParallelToolCalls:=Empty _
+    )
+    
+    Debug.Print OpenAIExtractText(resp)
+    Exit Sub
 
-Set data = ParseJSON("[0, 1]")
-Set item = data.GetArrayItem(100)
-' Here item.IsValid is False
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
 ```
 
-## Objects
+## Function tool call example
 
-If `data.IsObject` returns `True` (or if `data.DataType` returns `JSONDATATYPE_OBJECT`), you can use the `ObjectHasKeys`/`ObjectKeys` properties and the `GetObjectItem()` method.
+Chat Completions supports function tools, and `tool_choice` defaults to `auto` when tools are present. `parallel_tool_calls` is a separate optional boolean. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
 
 ```vb
-Dim data As JsonData, key As Variant, item As JsonData
+Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim Messages As Collection
+    Dim ToolsJson As String
+    Dim toolCalls As JsonData
+    
+    On Error GoTo EH
+    
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    ToolsJson = _
+        "[" & _
+            "{" & _
+                """type"":""function""," & _
+                """function"":{" & _
+                    """name"":""get_current_weather""," & _
+                    """description"":""Get the current weather in a given location""," & _
+                    """parameters"":{" & _
+                        """type"":""object""," & _
+                        """properties"":{" & _
+                            """location"":{""type"":""string""}," & _
+                            """unit"":{""type"":""string"",""enum"":[""celsius"",""fahrenheit""]}" & _
+                        "}," & _
+                        """required"":[""location"",""unit""]," & _
+                        """additionalProperties"":false" & _
+                    "}," & _
+                    """strict"":true" & _
+                "}" & _
+            "}" & _
+        "]"
+    
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageUser("What is the weather in Boston today?")
+    
+    Set resp = ai.CreateChatCompletion( _
+        Model:="gpt-5.4", _
+        Messages:=Messages, _
+        Temperature:=Empty, _
+        MaxCompletionTokens:=Empty, _
+        Verbosity:=Empty, _
+        ResponseFormatJson:=Empty, _
+        ToolsJson:=ToolsJson, _
+        ToolChoiceJson:=OpenAIToolChoiceAuto(), _
+        ReasoningEffort:=Empty, _
+        Store:=Empty, _
+        MetadataJson:=Empty, _
+        ParallelToolCalls:=False _
+    )
+    
+    Set toolCalls = OpenAIExtractToolCalls(resp)
+    
+    Debug.Print "finish_reason = "; OpenAIExtractFinishReason(resp)
+    If Not toolCalls Is Nothing Then
+        If toolCalls.IsValid Then
+            Debug.Print toolCalls.ToJSON("  ")
+        Else
+            Debug.Print OpenAIExtractText(resp)
+        End If
+    Else
+        Debug.Print OpenAIExtractText(resp)
+    End If
+    
+    Exit Sub
 
-Set data = ParseJSON("{""key1"": 1, ""key2"": 9}")
-If data.IsObject And data.ObjectHasKeys Then
-    For Each key In data.ObjectKeys
-        Set item = data.GetObjectItem(key)
-        ' Work with item
-    Next
-End If
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
 ```
 
-If you try to access an unexisting object key, `GetObjectItem()` will return a `JsonData` object whose `IsValid` property is `False`:
+## Important VB6 client behavior
 
-```vb
-Dim data As JsonData, item As JsonData
+Your VB6 wrapper should follow these rules:
 
-Set data = ParseJSON("{""good"": true}")
-Set item = data.GetObjectItem("bad")
-' Here item.IsValid is False
+- Omit optional JSON fields entirely when they are not being used.
+- Do **not** send `Empty` values as raw JSON fields.
+- Serialize floating-point numbers with a leading zero, so `0.2` is emitted as `0.2`, not `.2`.
+- Only send `parallel_tool_calls` when you are actually sending tools, since it only applies during tool use. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
+- `metadata` must be a JSON object if sent. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
+- `response_format` must be a JSON object if sent. ([platform.openai.com](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai))
+
+## Recommendation
+
+If you continue evolving this client, consider adding a separate `CreateResponse` wrapper for the newer Responses API, since OpenAI recommends that API for new applications. ([platform.openai.com](https://platform.openai.com/docs/guides/chat-completions?utm_source=openai))
 ```
 
-## Getting a value by path
-
-You can use the `GetChildByPath()` method to quickly access object keys and array items.
-
-For example, if you have this JSON data string stored in a variable named `json`:
-
-```json
-{
-    "id": "AAA",
-    "purchase": [
-        {
-            "reference": "MyOrder",
-            "amount": {
-                "currency": "EUR",
-                "value": 123.45
-            }
-        }
-    ]
-}
-```
-
-You can retrieve the value of `value` with this code:
-
-```vb
-Dim data As JsonData, item As JsonData
-
-Set data = ParseJSON(json)
-Set item = data.GetChildByPath("purchase.0.amount.value")
-' Here item.IsValid is False if the path didn't resolve to an element,
-' and item.IsScalar is True if the element could be found and it's a scalar
-If item.IsScalar Then
-    ' ...
-End If
-```
+---
+Learn more:
+1. [Text generation - OpenAI API](https://platform.openai.com/docs/guides/chat-completions?utm_source=openai)
+2. [Chat Completions | OpenAI API Reference](https://platform.openai.com/docs/api-reference/chat/create-chat-completion?utm_source=openai)
