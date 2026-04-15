@@ -80,26 +80,22 @@ Public Function CreateChatCompletionSimple( _
            "{""role"":""user"",""content"":" & JsonString(UserPrompt) & "}" & _
            "]}"
     
-    Debug.Print "===== REQUEST JSON BEGIN ====="
-    Debug.Print body
-    Debug.Print "===== REQUEST JSON END ====="
-    
     Set CreateChatCompletionSimple = PostJson(ENDPOINT_CHAT_COMPLETIONS, body)
 End Function
 
 Public Function CreateChatCompletion( _
     ByVal Model As String, _
     ByVal Messages As Collection, _
-    Optional ByVal Temperature As Variant, _
-    Optional ByVal MaxCompletionTokens As Variant, _
-    Optional ByVal Verbosity As Variant, _
-    Optional ByVal ResponseFormatJson As Variant, _
-    Optional ByVal ToolsJson As Variant, _
-    Optional ByVal ToolChoiceJson As Variant, _
-    Optional ByVal ReasoningEffort As Variant, _
-    Optional ByVal Store As Variant, _
-    Optional ByVal MetadataJson As Variant, _
-    Optional ByVal ParallelToolCalls As Variant _
+    Optional ByVal Temperature As Variant = Empty, _
+    Optional ByVal MaxCompletionTokens As Variant = Empty, _
+    Optional ByVal Verbosity As Variant = Empty, _
+    Optional ByVal ResponseFormatJson As Variant = Empty, _
+    Optional ByVal ToolsJson As Variant = Empty, _
+    Optional ByVal ToolChoiceJson As Variant = Empty, _
+    Optional ByVal ReasoningEffort As Variant = "low", _
+    Optional ByVal Store As Variant = False, _
+    Optional ByVal MetadataJson As Variant = Empty, _
+    Optional ByVal ParallelToolCalls As Variant = Empty _
 ) As JsonData
     
     Dim body As String
@@ -111,32 +107,16 @@ Public Function CreateChatCompletion( _
     body = body & """model"":" & JsonString(Model)
     body = body & ",""messages"":" & CollectionToJsonArray(Messages)
     
-    AppendOptionalJsonDouble body, "temperature", Temperature
-    AppendOptionalJsonLong body, "max_completion_tokens", MaxCompletionTokens
-    AppendOptionalJsonString body, "verbosity", Verbosity
-    
-    If Not IsEmpty(ResponseFormatJson) Then
-        AppendOptionalRawJson body, "response_format", ResponseFormatJson
-    End If
-    
-    If Not IsEmpty(ToolsJson) Then
-        AppendOptionalRawJson body, "tools", ToolsJson
-    End If
-    
-    If Not IsEmpty(ToolChoiceJson) Then
-        AppendOptionalRawJson body, "tool_choice", ToolChoiceJson
-    End If
-    
-    AppendOptionalJsonString body, "reasoning_effort", ReasoningEffort
-    AppendOptionalJsonBoolean body, "store", Store
-    
-    If Not IsEmpty(MetadataJson) Then
-        AppendOptionalRawJson body, "metadata", MetadataJson
-    End If
-    
-    If Not IsEmpty(ParallelToolCalls) Then
-        AppendOptionalJsonBoolean body, "parallel_tool_calls", ParallelToolCalls
-    End If
+    If Not IsEmpty(Temperature) Then AppendOptionalJsonDouble body, "temperature", Temperature
+    If Not IsEmpty(MaxCompletionTokens) Then AppendOptionalJsonLong body, "max_completion_tokens", MaxCompletionTokens
+    If Not IsEmpty(Verbosity) Then AppendOptionalJsonString body, "verbosity", Verbosity
+    If Not IsEmpty(ResponseFormatJson) Then AppendOptionalRawJson body, "response_format", ResponseFormatJson
+    If Not IsEmpty(ToolsJson) Then AppendOptionalRawJson body, "tools", ToolsJson
+    If Not IsEmpty(ToolChoiceJson) Then AppendOptionalRawJson body, "tool_choice", ToolChoiceJson
+    If Not IsEmpty(ReasoningEffort) Then AppendOptionalJsonString body, "reasoning_effort", ReasoningEffort
+    If Not IsEmpty(Store) Then AppendOptionalJsonBoolean body, "store", Store
+    If Not IsEmpty(MetadataJson) Then AppendOptionalRawJson body, "metadata", MetadataJson
+    If Not IsEmpty(ParallelToolCalls) Then AppendOptionalJsonBoolean body, "parallel_tool_calls", ParallelToolCalls
     
     body = body & "}"
     

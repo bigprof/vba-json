@@ -101,12 +101,7 @@ Public Sub TestOpenAI_MultiTurn()
         Temperature:=1, _
         MaxCompletionTokens:=100, _
         Verbosity:="low", _
-        ResponseFormatJson:=Empty, _
-        ToolsJson:=Empty, _
-        ToolChoiceJson:=Empty, _
-        MetadataJson:=Empty, _
-        ReasoningEffort:="low", _
-        ParallelToolCalls:=Empty _
+        ReasoningEffort:="low" _
     )
     
     Debug.Print String(70, "=")
