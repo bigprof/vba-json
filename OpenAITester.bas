@@ -168,7 +168,7 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
     Messages.Add OpenAIMessageUser("What is the weather in Boston today?")
     
     Set resp = ai.CreateChatCompletion( _
-        Model:="gpt-5.4", _
+        Model:="gpt-5.2", _
         Messages:=Messages, _
         ToolsJson:=ToolsJson, _
         ToolChoiceJson:=OpenAIToolChoiceAuto(), _
