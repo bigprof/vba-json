@@ -220,7 +220,6 @@ Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
         Messages:=Messages, _
         ToolsJson:=ToolsJson, _
         ToolChoiceJson:=OpenAIToolChoiceAuto(), _
-        ReasoningEffort:=Empty, _
         ParallelToolCalls:=False _
     )
     
