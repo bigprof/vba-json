@@ -194,3 +194,72 @@ EH:
     Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
 End Sub
 
+Public Sub TestOpenAI_MultiTurn_UsesPriorAnswer()
+    Dim ai As OpenAI
+    Dim resp1 As JsonData
+    Dim resp2 As JsonData
+    Dim Messages As Collection
+    Dim assistantText1 As String
+    Dim followUp As String
+
+    On Error GoTo EH
+
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+
+    ' Turn 1: ask for something we can build on
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper("You are a concise assistant. Use plain language.")
+    Messages.Add OpenAIMessageUser( _
+        "Give me 3 bullet points explaining COM in VB6, plus a short analogy." _
+    )
+
+    Set resp1 = ai.CreateChatCompletion( _
+        Model:="gpt-5.4", _
+        Messages:=Messages, _
+        Temperature:=1, _
+        MaxCompletionTokens:=200, _
+        Verbosity:="low", _
+        ReasoningEffort:="low" _
+    )
+
+    assistantText1 = OpenAIExtractText(resp1)
+
+    Debug.Print String(70, "=")
+    Debug.Print "TURN 1 (assistant)"
+    Debug.Print String(70, "=")
+    Debug.Print assistantText1
+    Debug.Print
+
+    ' Turn 2: use the prior assistant output as the basis for a new request
+    ' Important: append the assistant message to the same Messages collection
+    Messages.Add OpenAIMessageAssistant(assistantText1)
+
+    followUp = _
+        "Using your explanation above:" & vbCrLf & _
+        "1) write a tiny VB6 pseudo-example of creating an object and calling a method," & vbCrLf & _
+        "2) then rewrite your analogy in one sentence for a 10-year-old."
+
+    Messages.Add OpenAIMessageUser(followUp)
+
+    Set resp2 = ai.CreateChatCompletion( _
+        Model:="gpt-5.4", _
+        Messages:=Messages, _
+        Temperature:=1, _
+        MaxCompletionTokens:=250, _
+        Verbosity:="low", _
+        ReasoningEffort:="low" _
+    )
+
+    Debug.Print String(70, "=")
+    Debug.Print "TURN 2 (assistant)"
+    Debug.Print String(70, "=")
+    Debug.Print OpenAIExtractText(resp2)
+    Debug.Print
+
+    Exit Sub
+
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
+

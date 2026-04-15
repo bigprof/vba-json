@@ -1,6 +1,6 @@
 Json = 50, 50, 1090, 757, C
 JsonData = 75, 75, 1115, 782, C
-Tester = 100, 100, 1140, 807, C
+Tester = 100, 100, 1140, 807, Z
 OpenAI = 125, 125, 1165, 832, C
 OpenAIHelpers = 100, 100, 1140, 807, C
-OpenAITester = 100, 100, 1140, 833, Z
+OpenAITester = 100, 100, 1140, 833, 

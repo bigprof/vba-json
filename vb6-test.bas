@@ -78,6 +78,7 @@ Public Sub Main()
     TestOpenAI_JsonSchema
     TestOpenAI_JsonObject
     TestOpenAI_FunctionToolCall_RequestOnly
+    TestOpenAI_MultiTurn_UsesPriorAnswer
     
     MsgBox "Done. Check the Immediate Window.", vbInformation
     Exit Sub
