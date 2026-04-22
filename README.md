@@ -2,6 +2,192 @@
 
 A small VB6 client for working with JSON and the OpenAI Chat Completions API.
 
+---
+
+## JSON Library
+
+The library ships two files that together form a lightweight JSON parser and serializer for VB6 / VBA:
+
+| File | Purpose |
+|------|---------|
+| `Json.bas` | `ParseJSON()` function – parses a JSON string into a `JsonData` tree |
+| `JsonData.cls` | Class representing a single JSON value (object, array, or scalar) |
+
+### Parsing a JSON string
+
+```vb
+Dim root As JsonData
+root = ParseJSON("{""name"":""Alice"",""age"":30}")
+
+If root.IsValid Then
+    Debug.Print root.GetObjectItem("name").ScalarValue  ' Alice
+    Debug.Print root.GetObjectItem("age").ScalarValue   ' 30
+End If
+```
+
+`ParseJSON` returns a `JsonData` object. If the string cannot be parsed, `IsValid` returns `False`.
+
+### JsonData – type constants
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `JSONDATATYPE_INVALID` | 0 | Parse failed or node not found |
+| `JSONDATATYPE_SCALAR` | 1 | A string, number, boolean, or null value |
+| `JSONDATATYPE_ARRAY` | 2 | A JSON array |
+| `JSONDATATYPE_OBJECT` | 3 | A JSON object |
+
+### JsonData – properties and methods
+
+#### Inspecting the type
+
+| Member | Returns | Description |
+|--------|---------|-------------|
+| `IsValid` | `Boolean` | `True` when `DataType <> JSONDATATYPE_INVALID` |
+| `DataType` | `Long` | One of the `JSONDATATYPE_*` constants above |
+| `IsScalar` | `Boolean` | `True` when the node is a scalar value |
+| `IsArray` | `Boolean` | `True` when the node is an array |
+| `IsObject` | `Boolean` | `True` when the node is an object |
+
+#### Working with scalar values
+
+```vb
+Dim node As JsonData
+Set node = root.GetChildByPath("user.active")
+
+If node.IsScalar Then
+    If IsNull(node.ScalarValue) Then
+        Debug.Print "null"
+    Else
+        Debug.Print CStr(node.ScalarValue)   ' True / False / number / string
+    End If
+End If
+```
+
+| Member | Returns | Description |
+|--------|---------|-------------|
+| `ScalarValue` | `Variant` | The raw VB `Variant` for a scalar node. May be `Null` for JSON `null`. |
+
+#### Working with arrays
+
+```vb
+Dim arr As JsonData
+Set arr = root.GetChildByPath("items")
+
+Dim i As Long
+For i = 0 To arr.ArrayLength - 1
+    Debug.Print arr.GetArrayItem(i).ScalarValue
+Next i
+```
+
+| Member | Returns | Description |
+|--------|---------|-------------|
+| `ArrayLength` | `Long` | Number of elements in the array |
+| `GetArrayItem(index As Long)` | `JsonData` | Element at the given 0-based index. Returns an invalid `JsonData` when out of range. |
+
+#### Working with objects
+
+```vb
+Dim obj As JsonData
+Set obj = root.GetChildByPath("user")
+
+Dim key As Variant
+For Each key In obj.ObjectKeys
+    Debug.Print key & " = " & obj.GetObjectItem(CStr(key)).ScalarValue
+Next key
+```
+
+| Member | Returns | Description |
+|--------|---------|-------------|
+| `ObjectHasKeys` | `Boolean` | `True` when the object has at least one key |
+| `ObjectKeys` | `String()` | Array of key names in declaration order |
+| `GetObjectItem(key As String)` | `JsonData` | Value for the given key. Returns an invalid `JsonData` when the key does not exist. |
+
+#### Navigating with a dot-path
+
+`GetChildByPath` lets you navigate deeply nested structures without intermediate variables. Use `.` as the path separator and integer indices for arrays.
+
+```vb
+' JSON: {"user":{"name":"Alice"},"items":[{"value":123},{"value":456},"hello"]}
+Debug.Print root.GetChildByPath("user.name").ScalarValue        ' Alice
+Debug.Print root.GetChildByPath("items.0.value").ScalarValue    ' 123
+Debug.Print root.GetChildByPath("items.2").ScalarValue          ' hello
+```
+
+If any part of the path is missing or the type is not traversable, the method returns an invalid `JsonData` (i.e. `IsValid = False`) rather than raising an error.
+
+| Member | Returns | Description |
+|--------|---------|-------------|
+| `GetChildByPath(path As String)` | `JsonData` | Dot-separated path. Use numeric keys for array indices. Returns `Me` for an empty path. |
+
+### Serializing back to JSON
+
+Call `ToJSON` on any `JsonData` node to produce a JSON string:
+
+```vb
+' Pretty-printed with two-space indent
+Debug.Print root.ToJSON("  ")
+
+' Compact (no indentation, no newlines)
+Debug.Print root.ToJSON("", 0, "")
+
+' Default: tab-indented
+Debug.Print root.ToJSON()
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `IndentWith` | `String` | `vbTab` | String repeated once per nesting level |
+| `Depth` | `Long` | `0` | Starting depth (normally leave at 0) |
+| `NewLineSequence` | `String` | `vbNewLine` | Line separator between tokens |
+
+### JSON helper functions (`OpenAIHelpers.bas`)
+
+These functions make it easy to build JSON strings manually without a serializer.
+
+#### `JsonString(value As String) As String`
+
+Encodes a VB string as a properly escaped JSON string literal (including `\n`, `\t`, Unicode escapes, etc.).
+
+```vb
+Dim s As String
+s = JsonString("Hello ""World""")
+' Result: "Hello \"World\""
+```
+
+#### `JsonBoolean(value As Boolean) As String`
+
+Returns `"true"` or `"false"`.
+
+```vb
+Debug.Print JsonBoolean(True)   ' true
+Debug.Print JsonBoolean(False)  ' false
+```
+
+#### `JsonNumber(value As Double) As String`
+
+Formats a number as a valid JSON number, guaranteeing a leading zero before the decimal point (e.g. `0.5` instead of `.5`).
+
+```vb
+Debug.Print JsonNumber(0.5)   ' 0.5
+Debug.Print JsonNumber(-0.2)  ' -0.2
+```
+
+#### `CollectionToJsonArray(Items As Collection) As String`
+
+Converts a `Collection` of already-serialized JSON values into a JSON array string.
+
+```vb
+Dim parts As New Collection
+parts.Add JsonString("red")
+parts.Add JsonString("green")
+parts.Add JsonString("blue")
+
+Debug.Print CollectionToJsonArray(parts)
+' ["red","green","blue"]
+```
+
+---
+
 ## Notes
 
 - These examples use the **Chat Completions API**.
@@ -259,7 +445,6 @@ Your VB6 wrapper should follow these rules:
 ## Recommendation
 
 If you continue evolving this client, consider adding a separate `CreateResponse` wrapper for the newer Responses API, since OpenAI recommends that API for new applications. ([platform.openai.com](https://platform.openai.com/docs/guides/chat-completions?utm_source=openai))
-```
 
 ---
 Learn more:
