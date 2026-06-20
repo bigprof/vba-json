@@ -440,9 +440,9 @@ Private Sub ProcessToolCalls(ByVal toolCalls As JsonData, ByRef Messages As Coll
         
         ii = CStr(i - 1) ' JSON arrays are typically 0-indexed
 
-        toolId = toolCalls.GetChildByPath(ii & ".id").StringValue
-        toolName = toolCalls.GetChildByPath(ii & ".function.name").StringValue
-        toolInput = toolCalls.GetChildByPath(ii & ".function.arguments").StringValue
+        toolId = toolCalls.GetChildByPath(ii & ".id").ScalarValue
+        toolName = toolCalls.GetChildByPath(ii & ".function.name").ScalarValue
+        toolInput = toolCalls.GetChildByPath(ii & ".function.arguments").ScalarValue
         
         Debug.Print "  Tool #" & i & ": " & toolName
         Debug.Print "    Input: " & toolInput
