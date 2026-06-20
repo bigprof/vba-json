@@ -288,53 +288,8 @@ Public Sub TestOpenAI_FunctionToolCall_RequestResponseLoop()
     Set ai = New OpenAI
     ai.ApiKey = Environ$("OPENAI_API_KEY")
     
-    ' Define the tools available to the assistant
-    ToolsJson = _
-        "[" & _
-            "{" & _
-                """type"":""function""," & _
-                """function"":{" & _
-                    """name"":""get_current_weather""," & _
-                    """description"":""Get the current weather in a given location""," & _
-                    """parameters"":{" & _
-                        """type"":""object""," & _
-                        """properties"":{" & _
-                            """location"":{" & _
-                                """type"":""string""," & _
-                                """description"":""The city and state, e.g. San Francisco, CA" & _
-                            """}," & _
-                            """unit"":{" & _
-                                """type"":""string""," & _
-                                """enum"":[""celsius"",""fahrenheit""]," & _
-                                """description"":""Temperature unit" & _
-                            """}" & _
-                        "}," & _
-                        """required"":[""location"",""unit""]," & _
-                        """additionalProperties"":false" & _
-                    "}," & _
-                    """strict"":true" & _
-                "}" & _
-            "}," & _
-            "{" & _
-                """type"":""function""," & _
-                """function"":{" & _
-                    """name"":""get_location_coordinates""," & _
-                    """description"":""Get geographic coordinates for a location""," & _
-                    """parameters"":{" & _
-                        """type"":""object""," & _
-                        """properties"":{" & _
-                            """location"":{" & _
-                                """type"":""string""," & _
-                                """description"":""The city and state, e.g. San Francisco, CA" & _
-                            """}" & _
-                        "}," & _
-                        """required"":[""location""]," & _
-                        """additionalProperties"":false" & _
-                    "}," & _
-                    """strict"":true" & _
-                "}" & _
-            "}" & _
-        "]"
+    ' Build the tools JSON using a helper function
+    ToolsJson = BuildWeatherToolsJson()
     
     ' Initialize the message collection with a user question
     Set Messages = New Collection
@@ -418,6 +373,44 @@ Public Sub TestOpenAI_FunctionToolCall_RequestResponseLoop()
 EH:
     Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
 End Sub
+
+' ============================================================================
+' Helper: Build weather tools JSON
+' ============================================================================
+
+Private Function BuildWeatherToolsJson() As String
+    Dim s1 As String
+    Dim s2 As String
+    Dim result As String
+    
+    ' Tool 1: get_current_weather
+    s1 = "{""type"":""function"","
+    s1 = s1 & """function"":{""name"":""get_current_weather"","
+    s1 = s1 & """description"":""Get the current weather in a given location"","
+    s1 = s1 & """parameters"":{""type"":""object"","
+    s1 = s1 & """properties"":{""location"":{""type"":""string"","
+    s1 = s1 & """description"":""The city and state, e.g. San Francisco, CA""},"
+    s1 = s1 & """unit"":{""type"":""string"","
+    s1 = s1 & """enum"":[""celsius"",""fahrenheit""],"
+    s1 = s1 & """description"":""Temperature unit""}},"
+    s1 = s1 & """required"":[""location"",""unit""],"
+    s1 = s1 & """additionalProperties"":false},"
+    s1 = s1 & """strict"":true}}}"
+    
+    ' Tool 2: get_location_coordinates
+    s2 = "{""type"":""function"","
+    s2 = s2 & """function"":{""name"":""get_location_coordinates"","
+    s2 = s2 & """description"":""Get geographic coordinates for a location"","
+    s2 = s2 & """parameters"":{""type"":""object"","
+    s2 = s2 & """properties"":{""location"":{""type"":""string"","
+    s2 = s2 & """description"":""The city and state, e.g. San Francisco, CA""}},"
+    s2 = s2 & """required"":[""location""],"
+    s2 = s2 & """additionalProperties"":false},"
+    s2 = s2 & """strict"":true}}}"
+    
+    result = "[" & s1 & "," & s2 & "]"
+    BuildWeatherToolsJson = result
+End Function
 
 ' ============================================================================
 ' Helper: Process tool calls and add results to message history
