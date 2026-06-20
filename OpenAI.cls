@@ -92,7 +92,7 @@ Public Function CreateChatCompletion( _
     Optional ByVal ResponseFormatJson As Variant = Empty, _
     Optional ByVal ToolsJson As Variant = Empty, _
     Optional ByVal ToolChoiceJson As Variant = Empty, _
-    Optional ByVal ReasoningEffort As Variant = "low", _
+    Optional ByVal ReasoningEffort As Variant = Empty, _
     Optional ByVal Store As Variant = False, _
     Optional ByVal MetadataJson As Variant = Empty, _
     Optional ByVal ParallelToolCalls As Variant = Empty _
@@ -147,6 +147,11 @@ Private Function PostJson(ByVal RelativeUrl As String, ByVal body As String) As 
     If LenB(mProject) <> 0 Then
         http.setRequestHeader "OpenAI-Project", mProject
     End If
+    
+    Debug.Print ""
+    Debug.Print "PostJson body:"
+    Debug.Print body
+    Debug.Print
     
     http.send body
     
