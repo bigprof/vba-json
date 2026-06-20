@@ -430,7 +430,7 @@ Private Sub ProcessToolCalls(ByVal toolCalls As JsonData, ByRef Messages As Coll
     
     ' Get the count of tool calls
     ' Assuming toolCalls is a JSON array
-    toolCount = toolCalls.Count
+    toolCount = toolCalls.ArrayLength
     
     Debug.Print "Processing " & toolCount & " tool call(s)..."
     
