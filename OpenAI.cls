@@ -15,6 +15,7 @@ Option Explicit
 
 Private Const DEFAULT_BASE_URL As String = "https://api.openai.com/v1"
 Private Const ENDPOINT_CHAT_COMPLETIONS As String = "/chat/completions"
+Private Const ENDPOINT_RESPONSES As String = "/responses"
 
 Private mApiKey As String
 Private mBaseUrl As String
@@ -299,5 +300,113 @@ Private Sub AppendOptionalJsonDouble(ByRef body As String, ByVal fieldName As St
 BadValue:
     Err.Raise vbObjectError + 2006, "OpenAI.AppendOptionalJsonDouble", _
         "Invalid optional numeric field '" & fieldName & "': " & Err.Description
+End Sub
+
+' ============================================================================
+' Responses API methods
+' ============================================================================
+
+Public Function CreateResponseSimple( _
+    ByVal Model As String, _
+    ByVal Instructions As String, _
+    ByVal UserInput As String _
+) As JsonData
+
+    Dim body As String
+
+    ValidateConfiguration
+
+    body = "{""model"":" & JsonString(Model) & _
+           ",""instructions"":" & JsonString(Instructions) & _
+           ",""input"":" & JsonString(UserInput) & _
+           "}"
+
+    Set CreateResponseSimple = PostJson(ENDPOINT_RESPONSES, body)
+End Function
+
+Public Function CreateResponse( _
+    ByVal Model As String, _
+    ByVal InputItems As Variant, _
+    Optional ByVal Instructions As Variant = Empty, _
+    Optional ByVal Temperature As Variant = Empty, _
+    Optional ByVal MaxOutputTokens As Variant = Empty, _
+    Optional ByVal TopP As Variant = Empty, _
+    Optional ByVal ToolsJson As Variant = Empty, _
+    Optional ByVal ToolChoiceJson As Variant = Empty, _
+    Optional ByVal TextFormatJson As Variant = Empty, _
+    Optional ByVal ReasoningJson As Variant = Empty, _
+    Optional ByVal PreviousResponseId As Variant = Empty, _
+    Optional ByVal ParallelToolCalls As Variant = Empty, _
+    Optional ByVal Store As Variant = Empty, _
+    Optional ByVal MaxToolCalls As Variant = Empty _
+) As JsonData
+
+    Dim body As String
+
+    ValidateConfiguration
+    ValidateCreateResponseInputs Model, InputItems
+
+    body = "{"
+    body = body & """model"":" & JsonString(Model)
+
+    ' InputItems: String (simple text) or Collection (message objects)
+    If VarType(InputItems) = vbString Then
+        body = body & ",""input"":" & JsonString(CStr(InputItems))
+    Else
+        body = body & ",""input"":" & CollectionToJsonArray(InputItems)
+    End If
+
+    If Not IsEmpty(Instructions) Then AppendOptionalJsonString body, "instructions", Instructions
+    If Not IsEmpty(Temperature) Then AppendOptionalJsonDouble body, "temperature", Temperature
+    If Not IsEmpty(MaxOutputTokens) Then AppendOptionalJsonLong body, "max_output_tokens", MaxOutputTokens
+    If Not IsEmpty(TopP) Then AppendOptionalJsonDouble body, "top_p", TopP
+    If Not IsEmpty(ToolsJson) Then AppendOptionalRawJson body, "tools", ToolsJson
+    If Not IsEmpty(ToolChoiceJson) Then AppendOptionalRawJson body, "tool_choice", ToolChoiceJson
+    If Not IsEmpty(TextFormatJson) Then AppendOptionalRawJson body, "text", TextFormatJson
+    If Not IsEmpty(ReasoningJson) Then AppendOptionalRawJson body, "reasoning", ReasoningJson
+    If Not IsEmpty(PreviousResponseId) Then AppendOptionalJsonString body, "previous_response_id", PreviousResponseId
+    If Not IsEmpty(ParallelToolCalls) Then AppendOptionalJsonBoolean body, "parallel_tool_calls", ParallelToolCalls
+    If Not IsEmpty(Store) Then AppendOptionalJsonBoolean body, "store", Store
+    If Not IsEmpty(MaxToolCalls) Then AppendOptionalJsonLong body, "max_tool_calls", MaxToolCalls
+
+    body = body & "}"
+
+    Set CreateResponse = PostJson(ENDPOINT_RESPONSES, body)
+End Function
+
+Private Sub ValidateCreateResponseInputs(ByVal Model As String, ByVal InputItems As Variant)
+    If LenB(Trim$(Model)) = 0 Then
+        Err.Raise vbObjectError + 1200, "OpenAI.CreateResponse", "Model is required."
+    End If
+
+    If IsEmpty(InputItems) Then
+        Err.Raise vbObjectError + 1201, "OpenAI.CreateResponse", "InputItems is required."
+    End If
+
+    If IsNull(InputItems) Then
+        Err.Raise vbObjectError + 1202, "OpenAI.CreateResponse", "InputItems must not be null."
+    End If
+
+    If VarType(InputItems) = vbString Then
+        If LenB(Trim$(CStr(InputItems))) = 0 Then
+            Err.Raise vbObjectError + 1203, "OpenAI.CreateResponse", "InputItems string must not be empty."
+        End If
+    ElseIf VarType(InputItems) = vbObject Then
+        ' Assume it's a Collection
+        On Error Resume Next
+        Dim col As Collection
+        Set col = InputItems
+        If Err.Number <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Err.Raise vbObjectError + 1204, "OpenAI.CreateResponse", "InputItems must be a String or a Collection."
+        End If
+        On Error GoTo 0
+        If col.Count = 0 Then
+            Err.Raise vbObjectError + 1205, "OpenAI.CreateResponse", "InputItems collection must not be empty."
+        End If
+    Else
+        Err.Raise vbObjectError + 1206, "OpenAI.CreateResponse", "InputItems must be a String or a Collection."
+    End If
 End Sub
 

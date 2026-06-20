@@ -246,3 +246,118 @@ Public Function OpenAIToolChoiceRequired() As String
     OpenAIToolChoiceRequired = """required"""
 End Function
 
+' ============================================================================
+' Responses API helpers
+' ============================================================================
+
+Public Function ResponsesExtractText(ByVal Response As JsonData) As String
+    Dim node As JsonData
+    Dim msg As JsonData
+
+    ' Primary: use the convenience output_text field
+    Set node = Response.GetChildByPath("output_text")
+    If Not node Is Nothing Then
+        If node.IsValid Then
+            If node.IsScalar Then
+                If Not IsNull(node.ScalarValue) Then
+                    ResponsesExtractText = CStr(node.ScalarValue)
+                    Exit Function
+                End If
+            End If
+        End If
+    End If
+
+    ' Fallback: traverse output[] for the first message with text content
+    ' Path: output.0.content.0.text
+    Set msg = Response.GetChildByPath("output.0.content.0.text")
+    If Not msg Is Nothing Then
+        If msg.IsValid Then
+            If msg.IsScalar Then
+                If Not IsNull(msg.ScalarValue) Then
+                    ResponsesExtractText = CStr(msg.ScalarValue)
+                End If
+            End If
+        End If
+    End If
+End Function
+
+Public Function ResponsesExtractStatus(ByVal Response As JsonData) As String
+    Dim node As JsonData
+
+    Set node = Response.GetChildByPath("status")
+    If node Is Nothing Then Exit Function
+    If Not node.IsValid Then Exit Function
+    If Not node.IsScalar Then Exit Function
+    If IsNull(node.ScalarValue) Then Exit Function
+
+    ResponsesExtractStatus = CStr(node.ScalarValue)
+End Function
+
+Public Function ResponsesExtractOutputItems(ByVal Response As JsonData) As JsonData
+    Set ResponsesExtractOutputItems = Response.GetChildByPath("output")
+End Function
+
+Public Function ResponsesExtractToolCalls(ByVal Response As JsonData) As JsonData
+    ' Returns the output[] array node. Callers should iterate items where
+    ' type = "function_call" and extract name/arguments/call_id.
+    Set ResponsesExtractToolCalls = Response.GetChildByPath("output")
+End Function
+
+Public Function ResponsesTextFormatText() As String
+    ResponsesTextFormatText = "{""format"":{""type"":""text""}}"
+End Function
+
+Public Function ResponsesTextFormatJsonObject() As String
+    ResponsesTextFormatJsonObject = "{""format"":{""type"":""json_object""}}"
+End Function
+
+Public Function ResponsesTextFormatJsonSchema( _
+    ByVal Name As String, _
+    ByVal schemaJson As String, _
+    Optional ByVal Description As String = "", _
+    Optional ByVal Strict As Boolean = False _
+) As String
+
+    Dim s As String
+
+    s = "{""format"":{"
+    s = s & """type"":""json_schema"""
+    s = s & ",""name"":" & JsonString(Name)
+
+    If LenB(Description) <> 0 Then
+        s = s & ",""description"":" & JsonString(Description)
+    End If
+
+    s = s & ",""schema"":" & schemaJson
+    s = s & ",""strict"":" & JsonBoolean(Strict)
+    s = s & "}}"
+
+    ResponsesTextFormatJsonSchema = s
+End Function
+
+Public Function ResponsesReasoning( _
+    ByVal Effort As String, _
+    Optional ByVal Summary As String = "auto" _
+) As String
+
+    Dim s As String
+
+    s = "{""effort"":" & JsonString(Effort)
+    s = s & ",""summary"":" & JsonString(Summary)
+    s = s & "}"
+
+    ResponsesReasoning = s
+End Function
+
+Public Function ResponsesToolChoiceAuto() As String
+    ResponsesToolChoiceAuto = """auto"""
+End Function
+
+Public Function ResponsesToolChoiceNone() As String
+    ResponsesToolChoiceNone = """none"""
+End Function
+
+Public Function ResponsesToolChoiceRequired() As String
+    ResponsesToolChoiceRequired = """required"""
+End Function
+

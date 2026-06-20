@@ -482,3 +482,313 @@ Private Function ExecuteToolFunction(ByVal functionName As String, ByVal argumen
     End Select
 End Function
 
+' ============================================================================
+' Responses API tests
+' ============================================================================
+
+Public Sub TestResponsesSimple()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+
+    On Error GoTo EH
+
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+
+    Set resp = ai.CreateResponseSimple( _
+        "gpt-5.4", _
+        "You are a helpful assistant.", _
+        "Write a short haiku about VB6 and APIs." _
+    )
+
+    Debug.Print String(70, "=")
+    Debug.Print "RESPONSES SIMPLE TEST"
+    Debug.Print String(70, "=")
+    Debug.Print "Status: "; ResponsesExtractStatus(resp)
+    Debug.Print "Output: "; ResponsesExtractText(resp)
+    Debug.Print
+
+    Exit Sub
+
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
+
+Public Sub TestResponsesMultiTurn()
+    Dim ai As OpenAI
+    Dim resp1 As JsonData
+    Dim resp2 As JsonData
+    Dim firstId As String
+
+    On Error GoTo EH
+
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+
+    ' Turn 1: ask a question
+    Set resp1 = ai.CreateResponse( _
+        Model:="gpt-5.4", _
+        InputItems:="Tell me a short joke about programming.", _
+        Instructions:="You are a witty assistant. Keep responses under 2 sentences." _
+    )
+
+    Debug.Print String(70, "=")
+    Debug.Print "RESPONSES MULTI-TURN TEST"
+    Debug.Print String(70, "=")
+    Debug.Print "Turn 1 status: "; ResponsesExtractStatus(resp1)
+    Debug.Print "Turn 1 output: "; ResponsesExtractText(resp1)
+    Debug.Print
+
+    ' Extract the response id for chaining
+    firstId = CStr(resp1.GetChildByPath("id").ScalarValue)
+    Debug.Print "Response ID: "; firstId
+    Debug.Print
+
+    ' Turn 2: follow-up using previous_response_id
+    Set resp2 = ai.CreateResponse( _
+        Model:="gpt-5.4", _
+        InputItems:="Now explain why that joke is funny.", _
+        Instructions:="You are a witty assistant. Keep responses under 2 sentences.", _
+        PreviousResponseId:=firstId _
+    )
+
+    Debug.Print "Turn 2 status: "; ResponsesExtractStatus(resp2)
+    Debug.Print "Turn 2 output: "; ResponsesExtractText(resp2)
+    Debug.Print
+
+    Exit Sub
+
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
+
+Public Sub TestResponsesJsonSchema()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim schemaJson As String
+    Dim textFormat As String
+
+    On Error GoTo EH
+
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+
+    schemaJson = _
+        "{" & _
+            """type"":""object""," & _
+            """properties"":{" & _
+                """title"":{""type"":""string""}," & _
+                """year"":{""type"":""integer""}" & _
+            "}," & _
+            """required"":[""title"",""year""]," & _
+            """additionalProperties"":false" & _
+        "}"
+
+    textFormat = ResponsesTextFormatJsonSchema( _
+        Name:="movie_info", _
+        schemaJson:=schemaJson, _
+        Description:="Movie information", _
+        Strict:=True _
+    )
+
+    Set resp = ai.CreateResponse( _
+        Model:="gpt-5.4", _
+        InputItems:="Provide the title and year for The Matrix.", _
+        Instructions:="Return only data that matches the schema.", _
+        TextFormatJson:=textFormat _
+    )
+
+    Debug.Print String(70, "=")
+    Debug.Print "RESPONSES JSON SCHEMA TEST"
+    Debug.Print String(70, "=")
+    Debug.Print "Status: "; ResponsesExtractStatus(resp)
+    Debug.Print "Output: "; ResponsesExtractText(resp)
+    Debug.Print
+
+    Exit Sub
+
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
+
+Public Sub TestResponsesToolCalling()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim InputItems As Collection
+    Dim toolsJson As String
+    Dim outputItems As JsonData
+    Dim status As String
+    Dim loopCounter As Long
+    Dim maxLoops As Long
+    Dim i As Long
+    Dim item As JsonData
+    Dim itemType As String
+    Dim functionName As String
+    Dim functionArgs As String
+    Dim callId As String
+    Dim toolResult As String
+    Dim assistantOutput As String
+
+    On Error GoTo EH
+
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+
+    ' Build tools in flat Responses API format (no "function" wrapper)
+    toolsJson = BuildResponsesWeatherToolsJson()
+
+    Debug.Print String(80, "=")
+    Debug.Print "RESPONSES TOOL CALLING TEST"
+    Debug.Print String(80, "=")
+    Debug.Print
+
+    loopCounter = 0
+    maxLoops = 10
+
+    ' Start with a simple string input
+    Set InputItems = New Collection
+    InputItems.Add OpenAIMessageUser("What's the weather in Boston and what are its coordinates?")
+
+    Do While loopCounter < maxLoops
+        loopCounter = loopCounter + 1
+        Debug.Print "--- Iteration " & loopCounter & " ---"
+
+        Set resp = ai.CreateResponse( _
+            Model:="gpt-4.1", _
+            InputItems:=InputItems, _
+            Instructions:="You are a helpful weather assistant. Use tools to answer questions.", _
+            ToolsJson:=toolsJson, _
+            ToolChoiceJson:=ResponsesToolChoiceAuto(), _
+            ParallelToolCalls:=True, _
+            MaxOutputTokens:=1024 _
+        )
+
+        status = ResponsesExtractStatus(resp)
+        Debug.Print "Status: " & status
+
+        ' Check output items for function calls
+        Set outputItems = ResponsesExtractOutputItems(resp)
+
+        Dim hasToolCalls As Boolean
+        hasToolCalls = False
+
+        If Not outputItems Is Nothing Then
+            If outputItems.IsValid Then
+                If outputItems.IsArray Then
+                    assistantOutput = ""
+                    For i = 0 To outputItems.ArrayLength - 1
+                        Set item = outputItems.GetArrayItem(i)
+                        If Not item Is Nothing Then
+                            itemType = CStr(item.GetChildByPath("type").ScalarValue)
+
+                            If StrComp(itemType, "function_call", vbTextCompare) = 0 Then
+                                hasToolCalls = True
+                                callId = CStr(item.GetChildByPath("call_id").ScalarValue)
+                                functionName = CStr(item.GetChildByPath("name").ScalarValue)
+                                functionArgs = CStr(item.GetChildByPath("arguments").ScalarValue)
+
+                                Debug.Print "  Tool call: " & functionName
+                                Debug.Print "    Args: " & functionArgs
+
+                                toolResult = ExecuteToolFunction(functionName, functionArgs)
+                                Debug.Print "    Result: " & toolResult
+
+                                ' Add assistant function_call item and tool result to InputItems
+                                ' Responses API uses a different format for tool results
+                                ' The function_call output from the model and the function_call_output input
+                                InputItems.Add ResponsesBuildFunctionCallResult(callId, toolResult)
+                            ElseIf StrComp(itemType, "message", vbTextCompare) = 0 Then
+                                ' Collect assistant text
+                                Dim contentItem As JsonData
+                                Set contentItem = item.GetChildByPath("content.0.text")
+                                If Not contentItem Is Nothing Then
+                                    If contentItem.IsValid Then
+                                        assistantOutput = CStr(contentItem.ScalarValue)
+                                    End If
+                                End If
+                            End If
+                        End If
+                    Next i
+                End If
+            End If
+        End If
+
+        If hasToolCalls Then
+            Debug.Print "Tool calls processed, continuing loop..."
+        Else
+            Debug.Print "No more tool calls."
+            Debug.Print vbCrLf & "Final assistant response:"
+            Debug.Print ResponsesExtractText(resp)
+            Exit Do
+        End If
+
+        Debug.Print
+    Loop
+
+    If loopCounter >= maxLoops Then
+        Debug.Print "Maximum iterations reached (" & maxLoops & ")"
+    End If
+
+    Debug.Print String(80, "=")
+    Debug.Print "LOOP COMPLETED"
+    Debug.Print String(80, "=")
+
+    Exit Sub
+
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
+
+' ============================================================================
+' Responses API helpers for test
+' ============================================================================
+
+Private Function BuildResponsesWeatherToolsJson() As String
+    ' Tools in Responses API flat format: {type, name, description, parameters, strict}
+    ' No "function" wrapper unlike Chat Completions
+    Dim s1 As String
+    Dim s2 As String
+    Dim result As String
+
+    s1 = "{""type"":""function"","
+    s1 = s1 & """name"":""get_current_weather"","
+    s1 = s1 & """description"":""Get the current weather in a given location"","
+    s1 = s1 & """parameters"":{""type"":""object"","
+    s1 = s1 & """properties"":{""location"":{""type"":""string"","
+    s1 = s1 & """description"":""The city and state, e.g. San Francisco, CA""},"
+    s1 = s1 & """unit"":{""type"":""string"","
+    s1 = s1 & """enum"":[""celsius"",""fahrenheit""],"
+    s1 = s1 & """description"":""Temperature unit""}},"
+    s1 = s1 & """required"":[""location"",""unit""],"
+    s1 = s1 & """additionalProperties"":false},"
+    s1 = s1 & """strict"":true}"
+
+    s2 = "{""type"":""function"","
+    s2 = s2 & """name"":""get_location_coordinates"","
+    s2 = s2 & """description"":""Get geographic coordinates for a location"","
+    s2 = s2 & """parameters"":{""type"":""object"","
+    s2 = s2 & """properties"":{""location"":{""type"":""string"","
+    s2 = s2 & """description"":""The city and state, e.g. San Francisco, CA""}},"
+    s2 = s2 & """required"":[""location""],"
+    s2 = s2 & """additionalProperties"":false},"
+    s2 = s2 & """strict"":true}"
+
+    result = "[" & s1 & "," & s2 & "]"
+    Debug.Print ""
+    Debug.Print "Responses ToolsJson:"
+    Debug.Print result
+    Debug.Print
+    BuildResponsesWeatherToolsJson = result
+End Function
+
+Private Function ResponsesBuildFunctionCallResult(ByVal callId As String, ByVal output As String) As String
+    ' Responses API format for submitting a function call result:
+    ' {"type": "function_call_output", "call_id": "...", "output": "..."}
+    ResponsesBuildFunctionCallResult = _
+        "{" & _
+            """type"":""function_call_output""," & _
+            """call_id"":" & JsonString(callId) & "," & _
+            """output"":" & JsonString(output) & _
+        "}"
+End Function
+
