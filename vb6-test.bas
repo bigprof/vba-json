@@ -73,12 +73,13 @@ Public Sub Main()
     Debug.Print ""
     Debug.Print "Done."
     
-    TestOpenAISimple
-    TestOpenAI_MultiTurn
-    TestOpenAI_JsonSchema
-    TestOpenAI_JsonObject
-    TestOpenAI_FunctionToolCall_RequestOnly
-    TestOpenAI_MultiTurn_UsesPriorAnswer
+'    TestOpenAISimple
+'    TestOpenAI_MultiTurn
+'    TestOpenAI_JsonSchema
+'    TestOpenAI_JsonObject
+'    TestOpenAI_FunctionToolCall_RequestOnly
+'    TestOpenAI_MultiTurn_UsesPriorAnswer
+    TestOpenAI_FunctionToolCall_RequestResponseLoop
     
     MsgBox "Done. Check the Immediate Window.", vbInformation
     Exit Sub
