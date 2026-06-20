@@ -334,8 +334,9 @@ Public Sub TestOpenAI_FunctionToolCall_RequestResponseLoop()
             
             If Not toolCalls Is Nothing Then
                 If toolCalls.IsValid Then
-                    ' Add the assistant's response to message history
-                    Messages.Add OpenAIMessageAssistant(OpenAIExtractText(resp))
+                    ' Add the assistant's response to message history, including tool_calls
+                    ' so that subsequent 'tool' role messages are valid per the API
+                    Messages.Add OpenAIMessageAssistantWithToolCalls(OpenAIExtractText(resp), toolCalls.ToJSON())
                     
                     ' Process each tool call and add results
                     ProcessToolCalls toolCalls, Messages

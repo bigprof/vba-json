@@ -13,6 +13,16 @@ Public Function OpenAIMessageAssistant(ByVal text As String) As String
     OpenAIMessageAssistant = BuildMessageText("assistant", text)
 End Function
 
+Public Function OpenAIMessageAssistantWithToolCalls(ByVal text As String, ByVal toolCallsJson As String) As String
+    Dim s As String
+    s = "{"
+    s = s & """role"":""assistant"","
+    s = s & """content"":" & JsonString(text) & ","
+    s = s & """tool_calls"":" & toolCallsJson
+    s = s & "}"
+    OpenAIMessageAssistantWithToolCalls = s
+End Function
+
 Public Function OpenAIMessageTool(ByVal toolCallId As String, ByVal content As String) As String
     OpenAIMessageTool = _
         "{" & _
