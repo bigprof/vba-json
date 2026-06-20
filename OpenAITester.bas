@@ -131,6 +131,7 @@ Public Sub TestOpenAI_JsonSchema()
 EH:
     Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
 End Sub
+
 Public Sub TestOpenAI_FunctionToolCall_RequestOnly()
     Dim ai As OpenAI
     Dim resp As JsonData
@@ -262,4 +263,222 @@ Public Sub TestOpenAI_MultiTurn_UsesPriorAnswer()
 EH:
     Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
 End Sub
+
+' ============================================================================
+' NEW TEST: Full tool calling request-response loop
+' ============================================================================
+' This test demonstrates a complete tool call loop where:
+' 1. The client requests tool calls
+' 2. Tool results are collected and added to the message history
+' 3. The loop continues until finish_reason is no longer "tool_calls"
+' ============================================================================
+
+Public Sub TestOpenAI_FunctionToolCall_RequestResponseLoop()
+    Dim ai As OpenAI
+    Dim resp As JsonData
+    Dim Messages As Collection
+    Dim ToolsJson As String
+    Dim toolCalls As JsonData
+    Dim finishReason As String
+    Dim loopCounter As Long
+    Dim maxLoops As Long
+    
+    On Error GoTo EH
+    
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    ' Define the tools available to the assistant
+    ToolsJson = _
+        "[" & _
+            "{" & _
+                """type"":""function""," & _
+                """function"":{" & _
+                    """name"":""get_current_weather""," & _
+                    """description"":""Get the current weather in a given location""," & _
+                    """parameters"":{" & _
+                        """type"":""object""," & _
+                        """properties"":{" & _
+                            """location"":{" & _
+                                """type"":""string""," & _
+                                """description"":""The city and state, e.g. San Francisco, CA" & _
+                            """}," & _
+                            """unit"":{" & _
+                                """type"":""string""," & _
+                                """enum"":[""celsius"",""fahrenheit""]," & _
+                                """description"":""Temperature unit" & _
+                            """}" & _
+                        "}," & _
+                        """required"":[""location"",""unit""]," & _
+                        """additionalProperties"":false" & _
+                    "}," & _
+                    """strict"":true" & _
+                "}" & _
+            "}," & _
+            "{" & _
+                """type"":""function""," & _
+                """function"":{" & _
+                    """name"":""get_location_coordinates""," & _
+                    """description"":""Get geographic coordinates for a location""," & _
+                    """parameters"":{" & _
+                        """type"":""object""," & _
+                        """properties"":{" & _
+                            """location"":{" & _
+                                """type"":""string""," & _
+                                """description"":""The city and state, e.g. San Francisco, CA" & _
+                            """}" & _
+                        "}," & _
+                        """required"":[""location""]," & _
+                        """additionalProperties"":false" & _
+                    "}," & _
+                    """strict"":true" & _
+                "}" & _
+            "}" & _
+        "]"
+    
+    ' Initialize the message collection with a user question
+    Set Messages = New Collection
+    Messages.Add OpenAIMessageDeveloper( _
+        "You are a helpful weather assistant. Use the provided tools to answer questions." _
+    )
+    Messages.Add OpenAIMessageUser( _
+        "What's the weather in Boston and what are its coordinates?" _
+    )
+    
+    Debug.Print String(80, "=")
+    Debug.Print "TOOL CALL REQUEST-RESPONSE LOOP TEST"
+    Debug.Print String(80, "=")
+    Debug.Print
+    
+    loopCounter = 0
+    maxLoops = 10 ' Prevent infinite loops
+    
+    ' Main tool calling loop
+    Do While loopCounter < maxLoops
+        loopCounter = loopCounter + 1
+        Debug.Print "--- Iteration " & loopCounter & " ---"
+        
+        ' Send request to API
+        Set resp = ai.CreateChatCompletion( _
+            Model:="gpt-4o-mini", _
+            Messages:=Messages, _
+            MaxCompletionTokens:=1024, _
+            ToolsJson:=ToolsJson, _
+            ToolChoiceJson:=OpenAIToolChoiceAuto(), _
+            ParallelToolCalls:=True _
+        )
+        
+        ' Extract finish reason
+        finishReason = OpenAIExtractFinishReason(resp)
+        Debug.Print "Finish reason: " & finishReason
+        
+        ' Check if we have tool calls to process
+        If StrComp(finishReason, "tool_calls", vbTextCompare) = 0 Then
+            ' Extract tool calls from the response
+            Set toolCalls = OpenAIExtractToolCalls(resp)
+            
+            If Not toolCalls Is Nothing Then
+                If toolCalls.IsValid Then
+                    ' Add the assistant's response to message history
+                    Messages.Add OpenAIMessageAssistant(OpenAIExtractText(resp))
+                    
+                    ' Process each tool call and add results
+                    ProcessToolCalls toolCalls, Messages
+                    
+                    Debug.Print "Tool calls processed and results added to messages."
+                Else
+                    Debug.Print "Tool calls could not be parsed."
+                    Exit Do
+                End If
+            Else
+                Debug.Print "No tool calls found in response."
+                Exit Do
+            End If
+        Else
+            ' No more tool calls - exit loop
+            Debug.Print "Finish reason is not 'tool_calls', exiting loop."
+            Debug.Print vbCrLf & "Final assistant response:"
+            Debug.Print OpenAIExtractText(resp)
+            Exit Do
+        End If
+        
+        Debug.Print
+    Loop
+    
+    If loopCounter >= maxLoops Then
+        Debug.Print "Maximum iterations reached (" & maxLoops & ")"
+    End If
+    
+    Debug.Print String(80, "=")
+    Debug.Print "LOOP COMPLETED"
+    Debug.Print String(80, "=")
+    
+    Exit Sub
+
+EH:
+    Debug.Print "[ERROR] "; Err.Number; " - "; Err.Description
+End Sub
+
+' ============================================================================
+' Helper: Process tool calls and add results to message history
+' ============================================================================
+
+Private Sub ProcessToolCalls(ByVal toolCalls As JsonData, ByRef Messages As Collection)
+    Dim i As Long
+    Dim toolCount As Long
+    Dim toolName As String
+    Dim toolInput As String
+    Dim toolResult As String
+    Dim toolId As String
+    
+    ' Get the count of tool calls
+    ' Assuming toolCalls is a JSON array
+    toolCount = toolCalls.Count
+    
+    Debug.Print "Processing " & toolCount & " tool call(s)..."
+    
+    For i = 1 To toolCount
+        ' Extract tool information (adjust based on actual JSON structure)
+        ' This assumes: toolCalls[i].id, toolCalls[i].function.name, toolCalls[i].function.arguments
+        
+        toolId = toolCalls(i)("id").StringValue
+        toolName = toolCalls(i)("function")("name").StringValue
+        toolInput = toolCalls(i)("function")("arguments").StringValue
+        
+        Debug.Print "  Tool #" & i & ": " & toolName
+        Debug.Print "    Input: " & toolInput
+        
+        ' Execute the tool and get the result
+        toolResult = ExecuteToolFunction(toolName, toolInput)
+        Debug.Print "    Result: " & toolResult
+        
+        ' Add the tool result to the message history
+        ' Format: {"role": "tool", "tool_call_id": "...", "content": "..."}
+        Messages.Add OpenAIMessageTool(toolId, toolResult)
+    Next i
+End Sub
+
+' ============================================================================
+' Helper: Simulate tool execution
+' ============================================================================
+
+Private Function ExecuteToolFunction(ByVal functionName As String, ByVal arguments As String) As String
+    ' This is a mock implementation. In a real scenario, you would:
+    ' 1. Parse the JSON arguments
+    ' 2. Call the actual function or external service
+    ' 3. Return the result as a string
+    
+    Select Case LCase$(functionName)
+        Case "get_current_weather"
+            ' Mock weather data
+            ExecuteToolFunction = "{""location"":""Boston, MA"",""temperature"":72,""unit"":""fahrenheit"",""description"":""Partly cloudy""}"
+        
+        Case "get_location_coordinates"
+            ' Mock coordinates data
+            ExecuteToolFunction = "{""location"":""Boston, MA"",""latitude"":42.3601,""longitude"":-71.0589}"
+        
+        Case Else
+            ExecuteToolFunction = "{""error"":""Unknown function: " & functionName & """}"
+    End Select
+End Function
 
