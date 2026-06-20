@@ -395,7 +395,7 @@ Private Function BuildWeatherToolsJson() As String
     s1 = s1 & """description"":""Temperature unit""}},"
     s1 = s1 & """required"":[""location"",""unit""],"
     s1 = s1 & """additionalProperties"":false},"
-    s1 = s1 & """strict"":true}}}"
+    s1 = s1 & """strict"":true}}"
     
     ' Tool 2: get_location_coordinates
     s2 = "{""type"":""function"","
@@ -406,9 +406,13 @@ Private Function BuildWeatherToolsJson() As String
     s2 = s2 & """description"":""The city and state, e.g. San Francisco, CA""}},"
     s2 = s2 & """required"":[""location""],"
     s2 = s2 & """additionalProperties"":false},"
-    s2 = s2 & """strict"":true}}}"
+    s2 = s2 & """strict"":true}}"
     
     result = "[" & s1 & "," & s2 & "]"
+    Debug.Print ""
+    Debug.Print "ToolsJson:"
+    Debug.Print result
+    Debug.Print
     BuildWeatherToolsJson = result
 End Function
 
