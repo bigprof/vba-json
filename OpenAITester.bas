@@ -628,6 +628,7 @@ Public Sub TestResponsesToolCalling()
     Dim callId As String
     Dim toolResult As String
     Dim assistantOutput As String
+    Dim previousId As String
 
     On Error GoTo EH
 
@@ -644,6 +645,7 @@ Public Sub TestResponsesToolCalling()
 
     loopCounter = 0
     maxLoops = 10
+    previousId = ""
 
     ' Start with a simple string input
     Set InputItems = New Collection
@@ -653,24 +655,45 @@ Public Sub TestResponsesToolCalling()
         loopCounter = loopCounter + 1
         Debug.Print "--- Iteration " & loopCounter & " ---"
 
-        Set resp = ai.CreateResponse( _
-            Model:="gpt-4.1", _
-            InputItems:=InputItems, _
-            Instructions:="You are a helpful weather assistant. Use tools to answer questions.", _
-            ToolsJson:=toolsJson, _
-            ToolChoiceJson:=ResponsesToolChoiceAuto(), _
-            ParallelToolCalls:=True, _
-            MaxOutputTokens:=1024 _
-        )
+        If LenB(previousId) = 0 Then
+            ' First call: send the initial user message
+            Set resp = ai.CreateResponse( _
+                Model:="gpt-4.1", _
+                InputItems:=InputItems, _
+                Instructions:="You are a helpful weather assistant. Use tools to answer questions.", _
+                ToolsJson:=toolsJson, _
+                ToolChoiceJson:=ResponsesToolChoiceAuto(), _
+                ParallelToolCalls:=True, _
+                MaxOutputTokens:=1024 _
+            )
+        Else
+            ' Subsequent calls: chain via previous_response_id, send only new function_call_output items
+            Set resp = ai.CreateResponse( _
+                Model:="gpt-4.1", _
+                InputItems:=InputItems, _
+                Instructions:="You are a helpful weather assistant. Use tools to answer questions.", _
+                ToolsJson:=toolsJson, _
+                ToolChoiceJson:=ResponsesToolChoiceAuto(), _
+                ParallelToolCalls:=True, _
+                MaxOutputTokens:=1024, _
+                PreviousResponseId:=previousId _
+            )
+        End If
 
         status = ResponsesExtractStatus(resp)
         Debug.Print "Status: " & status
+
+        ' Capture the response id for chaining the next iteration
+        previousId = CStr(resp.GetChildByPath("id").ScalarValue)
 
         ' Check output items for function calls
         Set outputItems = ResponsesExtractOutputItems(resp)
 
         Dim hasToolCalls As Boolean
         hasToolCalls = False
+
+        ' Reset InputItems for the next iteration — only function_call_output items
+        Set InputItems = New Collection
 
         If Not outputItems Is Nothing Then
             If outputItems.IsValid Then
@@ -693,9 +716,7 @@ Public Sub TestResponsesToolCalling()
                                 toolResult = ExecuteToolFunction(functionName, functionArgs)
                                 Debug.Print "    Result: " & toolResult
 
-                                ' Add assistant function_call item and tool result to InputItems
-                                ' Responses API uses a different format for tool results
-                                ' The function_call output from the model and the function_call_output input
+                                ' Queue function_call_output for the next request
                                 InputItems.Add ResponsesBuildFunctionCallResult(callId, toolResult)
                             ElseIf StrComp(itemType, "message", vbTextCompare) = 0 Then
                                 ' Collect assistant text
