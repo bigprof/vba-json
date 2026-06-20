@@ -421,7 +421,7 @@ End Function
 ' ============================================================================
 
 Private Sub ProcessToolCalls(ByVal toolCalls As JsonData, ByRef Messages As Collection)
-    Dim i As Long
+    Dim i As Long, ii As String
     Dim toolCount As Long
     Dim toolName As String
     Dim toolInput As String
@@ -438,9 +438,11 @@ Private Sub ProcessToolCalls(ByVal toolCalls As JsonData, ByRef Messages As Coll
         ' Extract tool information (adjust based on actual JSON structure)
         ' This assumes: toolCalls[i].id, toolCalls[i].function.name, toolCalls[i].function.arguments
         
-        toolId = toolCalls(i)("id").StringValue
-        toolName = toolCalls(i)("function")("name").StringValue
-        toolInput = toolCalls(i)("function")("arguments").StringValue
+        ii = CStr(i - 1) ' JSON arrays are typically 0-indexed
+
+        toolId = toolCalls.GetChildByPath(ii & ".id").StringValue
+        toolName = toolCalls.GetChildByPath(ii & ".function.name").StringValue
+        toolInput = toolCalls.GetChildByPath(ii & ".function.arguments").StringValue
         
         Debug.Print "  Tool #" & i & ": " & toolName
         Debug.Print "    Input: " & toolInput
