@@ -83,7 +83,15 @@ Public Sub Start(ByVal method As String, ByVal url As String, ByVal body As Stri
                 For i = 1 To col.Count
                     Set item = col.Item(i)
                     If IsArray(item) Then
-                        mRequestHeaders.Add CStr(item(0)), CStr(item(1))
+                        Dim headerName As String
+                        Dim headerValue As String
+                        headerName = CStr(item(0))
+                        headerValue = CStr(item(1))
+                        If mRequestHeaders.Exists(headerName) Then
+                            mRequestHeaders.Item(headerName) = headerValue
+                        Else
+                            mRequestHeaders.Add headerName, headerValue
+                        End If
                     End If
                 Next i
             ElseIf TypeOf Headers Is Object Then
@@ -91,7 +99,11 @@ Public Sub Start(ByVal method As String, ByVal url As String, ByVal body As Stri
                 Dim dict As Object
                 Set dict = Headers
                 For Each key In dict.Keys
-                    mRequestHeaders.Add CStr(key), CStr(dict.Item(key))
+                    If mRequestHeaders.Exists(CStr(key)) Then
+                        mRequestHeaders.Item(CStr(key)) = CStr(dict.Item(key))
+                    Else
+                        mRequestHeaders.Add CStr(key), CStr(dict.Item(key))
+                    End If
                 Next key
             End If
         End If
