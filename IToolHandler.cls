@@ -49,6 +49,10 @@ Public Function GetParametersSchemaJson() As String
 End Function
 
 Public Property Get Strict() As Boolean
+    ' Return True to enable OpenAI Structured Outputs (strict mode).
+End Property
+
+Public Property Get Strict() As Boolean
     ' Whether strict mode is enabled for this tool's function definition.
     ' Default True for OpenAI structured outputs.
 End Property

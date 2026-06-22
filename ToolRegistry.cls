@@ -59,7 +59,7 @@ Public Sub Register(ByVal handler As IToolHandler)
             "A handler named '" & name & "' is already registered."
     End If
     
-    mHandlers.Add handler, name
+    mHandlers.Add name, handler
 End Sub
 
 Public Function Execute(ByVal toolName As String, ByVal argsJson As String) As String
