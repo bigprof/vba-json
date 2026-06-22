@@ -813,3 +813,55 @@ Private Function ResponsesBuildFunctionCallResult(ByVal callId As String, ByVal 
         "}"
 End Function
 
+' ============================================================================
+' Chat Window Test — Entry Point
+' ============================================================================
+
+Public Sub TestChatWindow()
+    ' Launch the chat window with a pre-configured ChatEngine.
+    ' Uses async HTTP (Layer 2) by default so the UI stays responsive.
+    '
+    ' Prerequisites:
+    '   OPENAI_API_KEY environment variable must be set.
+    
+    Dim frm As frmChat
+    Dim ai As OpenAI
+    Dim reg As ToolRegistry
+    Dim engine As ChatEngine
+    
+    ' --- Build the OpenAI client ---
+    Set ai = New OpenAI
+    ai.ApiKey = Environ$("OPENAI_API_KEY")
+    
+    If LenB(ai.ApiKey) = 0 Then
+        MsgBox "OPENAI_API_KEY environment variable is not set." & vbCrLf & _
+               "Please set it and try again.", vbCritical, "Configuration Error"
+        Exit Sub
+    End If
+    
+    ' --- Build the ToolRegistry with example tools ---
+    Set reg = New ToolRegistry
+    reg.Register New WeatherToolHandler
+    reg.Register New CoordinatesToolHandler
+    
+    ' --- Build the ChatEngine ---
+    Set engine = New ChatEngine
+    Set engine.OpenAI = ai
+    Set engine.ToolRegistry = reg
+    engine.SystemPrompt = "You are a helpful assistant. Use tools when needed to answer questions accurately."
+    engine.Model = "gpt-4o-mini"
+    engine.MaxTokens = 1024
+    engine.UseAsync = True  ' Layer 2: non-blocking HTTP
+    
+    ' --- Launch the form ---
+    Set frm = New frmChat
+    frm.SetChatEngine engine
+    frm.Show vbModal
+    
+    ' Cleanup
+    Set frm = Nothing
+    Set engine = Nothing
+    Set reg = Nothing
+    Set ai = Nothing
+End Sub
+

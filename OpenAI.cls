@@ -124,35 +124,75 @@ Public Function CreateChatCompletion( _
     Set CreateChatCompletion = PostJson(ENDPOINT_CHAT_COMPLETIONS, body)
 End Function
 
-Private Function PostJson(ByVal RelativeUrl As String, ByVal body As String) As JsonData
-    Dim http As MSXML2.XMLHTTP60
+' ============================================================================
+' BuildRequestBody — Public helper for async HTTP callers
+' ============================================================================
+' Builds the full URL and a Scripting.Dictionary of request headers from the
+' relative endpoint path and JSON body.  Callers that need to send the request
+' asynchronously (e.g. via AsyncHttpRequest) can use this to get the URL and
+' headers, then perform the HTTP send themselves.
+'
+' Returns the full URL as the function result.  Headers are placed in the
+' outHeaders dictionary (created if Nothing).
+' ============================================================================
+
+Public Function BuildRequestBody( _
+    ByVal RelativeUrl As String, _
+    ByVal body As String, _
+    ByRef outHeaders As Object _
+) As String
+    
     Dim url As String
-    Dim responseText As String
-    Dim parsed As JsonData
-    Dim apiError As String
     
     url = mBaseUrl & RelativeUrl
     
-    Set http = New MSXML2.XMLHTTP60
+    If outHeaders Is Nothing Then
+        Set outHeaders = CreateObject("Scripting.Dictionary")
+    End If
     
-    On Error GoTo TransportErr
-    
-    http.Open "POST", url, False
-    http.setRequestHeader "Content-Type", "application/json"
-    http.setRequestHeader "Authorization", "Bearer " & mApiKey
+    outHeaders.RemoveAll
+    outHeaders.Add "Content-Type", "application/json"
+    outHeaders.Add "Authorization", "Bearer " & mApiKey
     
     If LenB(mOrganization) <> 0 Then
-        http.setRequestHeader "OpenAI-Organization", mOrganization
+        outHeaders.Add "OpenAI-Organization", mOrganization
     End If
     
     If LenB(mProject) <> 0 Then
-        http.setRequestHeader "OpenAI-Project", mProject
+        outHeaders.Add "OpenAI-Project", mProject
     End If
     
     Debug.Print ""
     Debug.Print "PostJson body:"
     Debug.Print body
     Debug.Print
+    
+    BuildRequestBody = url
+End Function
+
+Private Function PostJson(ByVal RelativeUrl As String, ByVal body As String) As JsonData
+    Dim http As MSXML2.XMLHTTP60
+    Dim url As String
+    Dim responseText As String
+    Dim parsed As JsonData
+    Dim apiError As String
+    Dim headers As Object
+    Dim key As Variant
+    
+    ' Build URL and headers via the shared helper
+    Set headers = CreateObject("Scripting.Dictionary")
+    url = BuildRequestBody(RelativeUrl, body, headers)
+    
+    Set http = New MSXML2.XMLHTTP60
+    
+    On Error GoTo TransportErr
+    
+    http.Open "POST", url, False
+    
+    ' Apply all headers from the helper dictionary
+    For Each key In headers.Keys
+        http.setRequestHeader CStr(key), CStr(headers.Item(key))
+    Next key
     
     http.send body
     
