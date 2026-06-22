@@ -31,7 +31,7 @@ Option Explicit
 Public Event Completed(ByVal Status As Long, ByVal ResponseText As String)
 Public Event ErrorOccurred(ByVal Number As Long, ByVal Description As String)
 
-Private WithEvents mHttp As MSXML2.XMLHTTP60
+Private WithEvents mHttp As MSXML2.XMLHTTP
 Attribute mHttp.VB_VarHelpID = -1
 
 Private mIsBusy As Boolean
