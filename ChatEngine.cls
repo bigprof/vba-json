@@ -61,8 +61,7 @@ Private mLoopCounter As Long
 Private mMaxLoops As Long
 
 ' --- Async HTTP ---
-Private WithEvents mAsyncHttp As AsyncHttpRequest
-Attribute mAsyncHttp.VB_VarHelpID = -1
+Private mAsyncHttp As AsyncHttpRequest
 Private mAsyncUrl As String
 Private mAsyncBody As String
 
@@ -138,8 +137,12 @@ Public Sub ContinueLoop()
             DoApiCall
             
         Case WaitingForResponse
-            ' Async request is in flight — just pump messages.
-            ' The response will arrive via mAsyncHttp_Completed.
+            ' Async request is in flight — poll for completion.
+            If Not mAsyncHttp Is Nothing Then
+                If mAsyncHttp.Poll Then
+                    HandleAsyncResponse
+                End If
+            End If
             DoEvents
             
         Case Done
@@ -351,15 +354,19 @@ End Sub
 ' Async HTTP event handlers
 ' ============================================================================
 
-Private Sub mAsyncHttp_Completed(ByVal Status As Long, ByVal ResponseText As String)
+Private Sub HandleAsyncResponse()
     Dim parsed As JsonData
     Dim apiError As String
+    Dim status As Long
+    Dim responseText As String
+    
+    status = mAsyncHttp.StatusCode
+    responseText = mAsyncHttp.ResponseText
     
     On Error GoTo ParseErr
     
-    Set parsed = ParseJSON(ResponseText)
-    
-    If Status < 200 Or Status >= 300 Then
+    If status < 200 Or status >= 300 Then
+        Set parsed = ParseJSON(responseText)
         apiError = ""
         If Not parsed Is Nothing Then
             If parsed.IsValid Then
@@ -368,9 +375,9 @@ Private Sub mAsyncHttp_Completed(ByVal Status As Long, ByVal ResponseText As Str
         End If
         
         If LenB(apiError) <> 0 Then
-            RaiseEvent ErrorOccurred("HTTP " & CStr(Status) & ": " & apiError)
+            RaiseEvent ErrorOccurred("HTTP " & CStr(status) & ": " & apiError)
         Else
-            RaiseEvent ErrorOccurred("HTTP " & CStr(Status) & ": " & ResponseText)
+            RaiseEvent ErrorOccurred("HTTP " & CStr(status) & ": " & responseText)
         End If
         
         mState = Done
@@ -378,6 +385,7 @@ Private Sub mAsyncHttp_Completed(ByVal Status As Long, ByVal ResponseText As Str
         Exit Sub
     End If
     
+    Set parsed = ParseJSON(responseText)
     If parsed Is Nothing Then
         RaiseEvent ErrorOccurred("Response could not be parsed as JSON.")
         mState = Done
@@ -397,12 +405,6 @@ Private Sub mAsyncHttp_Completed(ByVal Status As Long, ByVal ResponseText As Str
 
 ParseErr:
     RaiseEvent ErrorOccurred("Error parsing async response: " & Err.Description)
-    mState = Done
-    RaiseEvent Done
-End Sub
-
-Private Sub mAsyncHttp_ErrorOccurred(ByVal Number As Long, ByVal Description As String)
-    RaiseEvent ErrorOccurred("Async HTTP error " & CStr(Number) & ": " & Description)
     mState = Done
     RaiseEvent Done
 End Sub

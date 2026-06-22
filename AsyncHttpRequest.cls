@@ -14,13 +14,13 @@ Attribute VB_Exposed = False
 Option Explicit
 
 ' ============================================================================
-' AsyncHttpRequest — Non-blocking HTTP wrapper using WithEvents on XMLHTTP60
+' AsyncHttpRequest — Non-blocking HTTP wrapper using polling on XMLHTTP
 ' ============================================================================
 ' Fires Completed or Error events when the response arrives.
 ' The caller's message pump (Timer + DoEvents) keeps the UI alive while waiting.
 '
 ' Usage:
-'   Private WithEvents mAsync As AsyncHttpRequest
+'   Private mAsync As AsyncHttpRequest
 '   Set mAsync = New AsyncHttpRequest
 '   mAsync.Start "POST", "https://api.openai.com/v1/chat/completions", body, headers
 '   ' ... Timer pumps DoEvents ...
@@ -31,16 +31,18 @@ Option Explicit
 Public Event Completed(ByVal Status As Long, ByVal ResponseText As String)
 Public Event ErrorOccurred(ByVal Number As Long, ByVal Description As String)
 
-Private WithEvents mHttp As MSXML2.XMLHTTP
-Attribute mHttp.VB_VarHelpID = -1
-
+Private mHttp As Object
 Private mIsBusy As Boolean
 Private mRequestHeaders As Object ' Scripting.Dictionary of header name -> value
+Private mStatus As Long
+Private mResponseText As String
 
 Private Sub Class_Initialize()
-    Set mHttp = New MSXML2.XMLHTTP60
+    Set mHttp = CreateObject("MSXML2.XMLHTTP.6.0")
     Set mRequestHeaders = CreateObject("Scripting.Dictionary")
     mIsBusy = False
+    mStatus = -1
+    mResponseText = ""
 End Sub
 
 Private Sub Class_Terminate()
@@ -133,20 +135,37 @@ Public Property Get IsBusy() As Boolean
 End Property
 
 Public Property Get StatusCode() As Long
-    On Error Resume Next
-    StatusCode = mHttp.Status
-    On Error GoTo 0
+    StatusCode = mStatus
 End Property
 
-Private Sub mHttp_onReadyStateChange()
-    Dim status As Long
-    Dim responseText As String
+Public Property Get ResponseText() As String
+    ResponseText = mResponseText
+End Property
+
+Public Function Poll() As Boolean
+    Dim ready As Long
     
-    If mHttp.readyState <> 4 Then Exit Sub ' Not done yet
+    If Not mIsBusy Then
+        Poll = False
+        Exit Function
+    End If
     
+    On Error GoTo PollErr
+    ready = mHttp.readyState
+    If ready = 4 Then
+        mIsBusy = False
+        mStatus = mHttp.Status
+        mResponseText = mHttp.responseText
+        Poll = True
+    Else
+        Poll = False
+    End If
+    Exit Function
+
+PollErr:
     mIsBusy = False
-    status = mHttp.Status
-    responseText = mHttp.responseText
-    
-    RaiseEvent Completed(status, responseText)
-End Sub
+    mStatus = -1
+    mResponseText = ""
+    RaiseEvent ErrorOccurred(Err.Number, "Polling error: " & Err.Description)
+    Poll = True
+End Function
